@@ -1,0 +1,11 @@
+name = Commerce Unleashed Order
+description = Intergration with Unleashed Software for orders.
+core = 7.x
+package = Commerce Unleashed
+
+dependencies[] = commerce_unleashed
+dependencies[] = commerce_unleashed_customer
+dependencies[] = commerce_uuid_order
+dependencies[] = commerce_uuid_line_item
+dependencies[] = views_datasource
+dependencies[] = views_json

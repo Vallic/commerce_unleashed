@@ -1,0 +1,28 @@
+<?php
+
+/**
+ * Impliments hook_views_api()
+ */
+function commerce_unleashed_order_views_api() {
+  return array(
+    'api' => 3,
+  );
+}
+
+function commerce_unleased_order_post($commerce_order) {
+  $order = views_json_get('unleashed_order_json', 'master', $commerce_order->order_id);
+  $line_items = views_json_get('unleashed_line_item_json', 'master', $commerce_order->order_id);
+  $user = views_json_get('unleashed_user_json', 'master', $commerce_order->uid);
+
+  $order->Customer = $user;
+  $order->SalesOrderLines = $line_items;
+
+  $order->Tax->TaxCode = 'None';
+
+  watchdog('commerce_unleashed', '<pre>' . print_r($order, TRUE) . '</pre>');
+
+  $endpoint = '/SalesInvoices/';
+  $responce = commerce_unleashed_post_json($endpoint, $commerce_order->uuid, $order);
+
+  watchdog('commerce_unleashed', '<pre>' . print_r($responce, TRUE) . '</pre>');
+}
