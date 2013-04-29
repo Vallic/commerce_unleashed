@@ -3,6 +3,9 @@ description = Intergration with Unleashed Software for orders.
 core = 7.x
 package = Commerce Unleashed
 
+dependencies[] = commerce
+dependencies[] = commerce_order
+dependencies[] = commerce_product
 dependencies[] = commerce_unleashed
 dependencies[] = commerce_unleashed_customer
 dependencies[] = commerce_uuid

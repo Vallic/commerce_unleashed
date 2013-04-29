@@ -10,22 +10,29 @@ function commerce_unleashed_order_views_api() {
 }
 
 function commerce_unleased_order_post($commerce_order) {
-  $line_items = views_json_get('unleashed_line_item_json', 'default', $commerce_order->order_id);
-  $order = views_json_get('unleashed_order_json', 'default', $commerce_order->order_id);
+
+  $order = views_json_get('unleashed_order_json', 'default', array($commerce_order->order_id));
 
   $owner = user_load($commerce_order->uid);
   $order->Customer = new stdClass();
-  $order->Customer->CustomerCode = $owner->name;
   $order->Customer->Guid = $owner->uuid;
 
+  $line_items = views_json_get('unleashed_line_item_json', 'default', array($commerce_order->order_id));
 
-  $order->SalesOrderLines = $line_items;
+  foreach ($line_items->SalesOrderLines as $key => $SalesOrderLine) {
+    $sku = $SalesOrderLine->SalesInvoiceLine->Product;
+    $commerce_product = commerce_product_load_by_sku($sku);
+    $line_items->SalesOrderLines[$key]->SalesInvoiceLine->Product = new stdClass();
+    $line_items->SalesOrderLines[$key]->SalesInvoiceLine->Product->Guid = $commerce_product->uuid;
+    $line_items->SalesOrderLines[$key]->SalesInvoiceLine->Product->ProductCode = $sku;
+  }
+
+  $order->SalesOrderLines = $line_items->SalesOrderLines;
 
   $order->Tax = new stdClass();
   $order->Tax->TaxCode = 'None';
 
-  watchdog('commerce_unleashed', '<pre>' . print_r($line_items, TRUE) . '</pre>');
-  watchdog('commerce_unleashed', '<pre>' . print_r($order, TRUE) . '</pre>');
+  watchdog('commerce_unleashed', '<pre>' . print_r(json_encode($order), TRUE) . '</pre>');
 
   $endpoint = '/SalesInvoices/';
   $responce = commerce_unleashed_post_json($endpoint, $commerce_order->uuid, $order);
