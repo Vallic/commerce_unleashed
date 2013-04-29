@@ -7,7 +7,7 @@
 /**
  * Impliments hook_views_detault_views().
  */
-function commerce_unleashed_order_views_default_views() {
+function commerce_unleashed_customer_views_default_views() {
   $views = array();
 
   $view = new view();
