@@ -10,15 +10,21 @@ function commerce_unleashed_order_views_api() {
 }
 
 function commerce_unleased_order_post($commerce_order) {
-  $order = views_json_get('unleashed_order_json', 'master', $commerce_order->order_id);
-  $line_items = views_json_get('unleashed_line_item_json', 'master', $commerce_order->order_id);
-  $user = views_json_get('unleashed_user_json', 'master', $commerce_order->uid);
+  $line_items = views_json_get('unleashed_line_item_json', 'default', $commerce_order->order_id);
+  $order = views_json_get('unleashed_order_json', 'default', $commerce_order->order_id);
 
-  $order->Customer = $user;
+  $owner = user_load($commerce_order->uid);
+  $order->Customer = new stdClass();
+  $order->Customer->CustomerCode = $owner->name;
+  $order->Customer->Guid = $owner->uuid;
+
+
   $order->SalesOrderLines = $line_items;
 
+  $order->Tax = new stdClass();
   $order->Tax->TaxCode = 'None';
 
+  watchdog('commerce_unleashed', '<pre>' . print_r($line_items, TRUE) . '</pre>');
   watchdog('commerce_unleashed', '<pre>' . print_r($order, TRUE) . '</pre>');
 
   $endpoint = '/SalesInvoices/';

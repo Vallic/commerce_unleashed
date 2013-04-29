@@ -10,7 +10,7 @@ function commerce_unleashed_product_views_api() {
 }
 
 function commerce_unleased_product_post($commerce_product) {
-  $data = views_json_get('unleashed_product_json', 'master', $commerce_product->product_id);
+  $data = views_json_get('unleashed_product_json', 'default', $commerce_product->product_id);
 
   $endpoint = '/Products/';
   $responce = commerce_unleashed_post_json($endpoint, $commerce_product->uuid, $data);
