@@ -13,7 +13,7 @@ function commerce_unleashed_customer_views_default_views() {
   $view = new view();
   $view->name = 'unleashed_user_json';
   $view->description = '';
-  $view->tag = 'default';
+  $view->tag = 'Unleashed, Commerce';
   $view->base_table = 'users';
   $view->human_name = 'Unleashed User JSON';
   $view->core = 7;
@@ -43,6 +43,12 @@ function commerce_unleashed_customer_views_default_views() {
   $handler->display->display_options['style_options']['unescaped_slashes'] = 0;
   $handler->display->display_options['style_options']['unescaped_unicode'] = 0;
   $handler->display->display_options['style_options']['char_encoding'] = array();
+  /* Field: User: User UUID */
+  $handler->display->display_options['fields']['uuid']['id'] = 'uuid';
+  $handler->display->display_options['fields']['uuid']['table'] = 'users';
+  $handler->display->display_options['fields']['uuid']['field'] = 'uuid';
+  $handler->display->display_options['fields']['uuid']['label'] = 'Guid';
+  $handler->display->display_options['fields']['uuid']['element_label_colon'] = FALSE;
   /* Field: User: Name */
   $handler->display->display_options['fields']['name']['id'] = 'name';
   $handler->display->display_options['fields']['name']['table'] = 'users';
@@ -51,24 +57,18 @@ function commerce_unleashed_customer_views_default_views() {
   $handler->display->display_options['fields']['name']['alter']['word_boundary'] = FALSE;
   $handler->display->display_options['fields']['name']['alter']['ellipsis'] = FALSE;
   $handler->display->display_options['fields']['name']['link_to_user'] = FALSE;
-  /* Field: User: User UUID */
-  $handler->display->display_options['fields']['uuid']['id'] = 'uuid';
-  $handler->display->display_options['fields']['uuid']['table'] = 'users';
-  $handler->display->display_options['fields']['uuid']['field'] = 'uuid';
-  $handler->display->display_options['fields']['uuid']['label'] = 'Guid';
-  $handler->display->display_options['fields']['uuid']['element_label_colon'] = FALSE;
-  /* Field: User: E-mail */
-  $handler->display->display_options['fields']['mail']['id'] = 'mail';
-  $handler->display->display_options['fields']['mail']['table'] = 'users';
-  $handler->display->display_options['fields']['mail']['field'] = 'mail';
-  $handler->display->display_options['fields']['mail']['label'] = 'Email';
-  $handler->display->display_options['fields']['mail']['link_to_user'] = '0';
   /* Field: User: Name */
   $handler->display->display_options['fields']['name_1']['id'] = 'name_1';
   $handler->display->display_options['fields']['name_1']['table'] = 'users';
   $handler->display->display_options['fields']['name_1']['field'] = 'name';
   $handler->display->display_options['fields']['name_1']['label'] = 'CustomerName';
   $handler->display->display_options['fields']['name_1']['link_to_user'] = FALSE;
+  /* Field: User: E-mail */
+  $handler->display->display_options['fields']['mail']['id'] = 'mail';
+  $handler->display->display_options['fields']['mail']['table'] = 'users';
+  $handler->display->display_options['fields']['mail']['field'] = 'mail';
+  $handler->display->display_options['fields']['mail']['label'] = 'Email';
+  $handler->display->display_options['fields']['mail']['link_to_user'] = '0';
   /* Contextual filter: User: Uid */
   $handler->display->display_options['arguments']['uid']['id'] = 'uid';
   $handler->display->display_options['arguments']['uid']['table'] = 'users';
@@ -78,7 +78,6 @@ function commerce_unleashed_customer_views_default_views() {
   $handler->display->display_options['arguments']['uid']['summary']['number_of_records'] = '0';
   $handler->display->display_options['arguments']['uid']['summary']['format'] = 'default_summary';
   $handler->display->display_options['arguments']['uid']['summary_options']['items_per_page'] = '25';
-
 
   $views[$view->name] = $view;
 
