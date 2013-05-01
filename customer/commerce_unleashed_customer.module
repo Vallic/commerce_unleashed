@@ -9,7 +9,7 @@ function commerce_unleashed_customer_views_api() {
   );
 }
 
-function commerce_unleased_customer_post($commerce_user) {
+function commerce_unleashed_customer_post($commerce_user) {
   $customer = views_json_get('unleashed_user_json', 'default', array($commerce_user->uid));
   $endpoint = '/Customers/';
   $responce = commerce_unleashed_post_json($endpoint, $commerce_user->uuid, $customer);

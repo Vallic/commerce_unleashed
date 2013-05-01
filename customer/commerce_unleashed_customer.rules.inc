@@ -10,7 +10,7 @@
 function commerce_unleashed_customer_rules_action_info() {
   $actions = array();
 
-  $actions['commerce_unleased_customer_post'] = array(
+  $actions['commerce_unleashed_customer_post'] = array(
     'label' => t('Post a customer to Unleashed'),
     'parameter' => array(
       'user' => array(
@@ -21,7 +21,7 @@ function commerce_unleashed_customer_rules_action_info() {
     ),
     'group' => t('Commerce Unleashed'),
     'callbacks' => array(
-      'execute' => 'commerce_unleased_customer_post',
+      'execute' => 'commerce_unleashed_customer_post',
     ),
   );
 
