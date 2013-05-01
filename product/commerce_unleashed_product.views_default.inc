@@ -12,8 +12,8 @@ function commerce_unleashed_product_views_default_views() {
 
   $view = new view();
   $view->name = 'unleashed_product_json';
-  $view->description = '';
-  $view->tag = 'default';
+  $view->description = 'View to create the JSON for posting a product to Unleashed';
+  $view->tag = 'Unleashed, Commerce';
   $view->base_table = 'commerce_product';
   $view->human_name = 'Unleashed Product JSON';
   $view->core = 7;
@@ -27,7 +27,8 @@ function commerce_unleashed_product_views_default_views() {
   $handler->display->display_options['cache']['type'] = 'none';
   $handler->display->display_options['query']['type'] = 'views_query';
   $handler->display->display_options['exposed_form']['type'] = 'basic';
-  $handler->display->display_options['pager']['type'] = 'full';
+  $handler->display->display_options['pager']['type'] = 'none';
+  $handler->display->display_options['pager']['options']['offset'] = '0';
   $handler->display->display_options['style_plugin'] = 'views_json';
   $handler->display->display_options['style_options']['root_object'] = '';
   $handler->display->display_options['style_options']['top_child_object'] = '';
@@ -72,6 +73,13 @@ function commerce_unleashed_product_views_default_views() {
   $handler->display->display_options['fields']['uuid']['field'] = 'uuid';
   $handler->display->display_options['fields']['uuid']['label'] = 'Guid';
   $handler->display->display_options['fields']['uuid']['element_label_colon'] = FALSE;
+  /* Field: Commerce Product: Status */
+  $handler->display->display_options['fields']['status']['id'] = 'status';
+  $handler->display->display_options['fields']['status']['table'] = 'commerce_product';
+  $handler->display->display_options['fields']['status']['field'] = 'status';
+  $handler->display->display_options['fields']['status']['label'] = 'Obsolete';
+  $handler->display->display_options['fields']['status']['type'] = 'boolean';
+  $handler->display->display_options['fields']['status']['not'] = 1;
   /* Contextual filter: Commerce Product: Product ID */
   $handler->display->display_options['arguments']['product_id']['id'] = 'product_id';
   $handler->display->display_options['arguments']['product_id']['table'] = 'commerce_product';
