@@ -13,7 +13,7 @@ function commerce_unleashed_product_rules_action_info() {
   $actions['commerce_unleashed_product_post'] = array(
     'label' => t('Post a product to Unleashed'),
     'parameter' => array(
-      'order' => array(
+      'commerce_product' => array(
         'type' => 'commerce_product',
         'label' => t('Product'),
         'save' => TRUE,
