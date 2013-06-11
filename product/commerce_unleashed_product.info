@@ -6,5 +6,4 @@ package = Commerce Unleashed
 dependencies[] = commerce_unleashed
 dependencies[] = commerce_uuid_product
 dependencies[] = commerce_uuid
-dependencies[] = views_datasource
 dependencies[] = views_json

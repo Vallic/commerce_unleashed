@@ -7,5 +7,4 @@ dependencies[] = commerce_unleashed
 dependencies[] = commerce_uuid
 dependencies[] = commerce_uuid_customer
 dependencies[] = uuid
-dependencies[] = views_datasource
 dependencies[] = views_json
