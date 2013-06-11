@@ -78,7 +78,7 @@ function commerce_unleashed_product_views_default_views() {
   $handler->display->display_options['fields']['status']['table'] = 'commerce_product';
   $handler->display->display_options['fields']['status']['field'] = 'status';
   $handler->display->display_options['fields']['status']['label'] = 'Obsolete';
-  $handler->display->display_options['fields']['status']['type'] = 'boolean';
+  $handler->display->display_options['fields']['status']['type'] = 'true-false';
   $handler->display->display_options['fields']['status']['not'] = 1;
   /* Contextual filter: Commerce Product: Product ID */
   $handler->display->display_options['arguments']['product_id']['id'] = 'product_id';
