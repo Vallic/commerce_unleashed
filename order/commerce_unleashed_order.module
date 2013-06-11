@@ -20,11 +20,11 @@ function commerce_unleased_order_post($commerce_order) {
   $line_items = views_json_get('unleashed_line_item_json', 'default', array($commerce_order->order_id));
 
   foreach ($line_items->SalesOrderLines as $key => $SalesOrderLine) {
-    $sku = $SalesOrderLine->SalesInvoiceLine->Product;
+    $sku = $SalesOrderLine->Product;
     $commerce_product = commerce_product_load_by_sku($sku);
-    $line_items->SalesOrderLines[$key]->SalesInvoiceLine->Product = new stdClass();
-    $line_items->SalesOrderLines[$key]->SalesInvoiceLine->Product->Guid = $commerce_product->uuid;
-    $line_items->SalesOrderLines[$key]->SalesInvoiceLine->Product->ProductCode = $sku;
+    $line_items->SalesOrderLines[$key]->Product = new stdClass();
+    $line_items->SalesOrderLines[$key]->Product->Guid = $commerce_product->uuid;
+    $line_items->SalesOrderLines[$key]->Product->ProductCode = $sku;
   }
 
   $order->SalesOrderLines = $line_items->SalesOrderLines;
