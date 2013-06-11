@@ -11,4 +11,5 @@ dependencies[] = commerce_unleashed_customer
 dependencies[] = commerce_uuid
 dependencies[] = commerce_uuid_order
 dependencies[] = commerce_uuid_line_item
+dependencies[] = views_datasource
 dependencies[] = views_json
