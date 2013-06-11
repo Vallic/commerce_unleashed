@@ -11,6 +11,10 @@ function commerce_unleashed_customer_views_api() {
 
 function commerce_unleashed_customer_post($commerce_user) {
   $customer = views_json_get('unleashed_user_json', 'default', array($commerce_user->uid));
+  watchdog('commerce_unleashed', '<pre>' . print_r(json_encode($customer), TRUE) . '</pre>');
+
   $endpoint = '/Customers/';
   $responce = commerce_unleashed_post_json($endpoint, $commerce_user->uuid, $customer);
+
+  watchdog('commerce_unleashed', '<pre>' . print_r($responce, TRUE) . '</pre>');
 }
