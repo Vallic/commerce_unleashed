@@ -10,7 +10,7 @@
 function commerce_unleashed_order_rules_action_info() {
   $actions = array();
 
-  $actions['commerce_unleased_order_post'] = array(
+  $actions['commerce_unleashed_order_post'] = array(
     'label' => t('Post an order to Unleashed'),
     'parameter' => array(
       'order' => array(
@@ -21,7 +21,7 @@ function commerce_unleashed_order_rules_action_info() {
     ),
     'group' => t('Commerce Unleashed'),
     'callbacks' => array(
-      'execute' => 'commerce_unleased_order_post',
+      'execute' => 'commerce_unleashed_order_post',
     ),
   );
 

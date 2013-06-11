@@ -9,7 +9,7 @@ function commerce_unleashed_order_views_api() {
   );
 }
 
-function commerce_unleased_order_post($commerce_order) {
+function commerce_unleashed_order_post($commerce_order) {
 
   $order = views_json_get('unleashed_order_json', 'default', array($commerce_order->order_id));
 
