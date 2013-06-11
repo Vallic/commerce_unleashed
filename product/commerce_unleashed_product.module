@@ -9,8 +9,12 @@ function commerce_unleashed_product_views_api() {
   );
 }
 
-function commerce_unleased_product_post($commerce_product) {
+function commerce_unleashed_product_post($commerce_product) {
   $data = views_json_get('unleashed_product_json', 'default', array($commerce_product->product_id));
+  watchdog('commerce_unleashed', '<pre>' . print_r(json_encode($data), TRUE) . '</pre>');
+
   $endpoint = '/Products/';
   $responce = commerce_unleashed_post_json($endpoint, $commerce_product->uuid, $data);
+
+  watchdog('commerce_unleashed_product', '<pre>' . print_r($responce, TRUE) . '</pre>');
 }
