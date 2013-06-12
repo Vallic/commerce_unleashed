@@ -21,10 +21,13 @@ function commerce_unleashed_order_post($commerce_order) {
 
   foreach ($line_items->SalesOrderLines as $key => $SalesOrderLine) {
     $sku = $SalesOrderLine->Product;
-    $commerce_product = commerce_product_load_by_sku($sku);
+
     $line_items->SalesOrderLines[$key]->Product = new stdClass();
-    $line_items->SalesOrderLines[$key]->Product->Guid = $commerce_product->uuid;
     $line_items->SalesOrderLines[$key]->Product->ProductCode = $sku;
+
+    if ($commerce_product = commerce_product_load_by_sku($sku)) {
+      $line_items->SalesOrderLines[$key]->Product->Guid = $commerce_product->uuid;
+    }
   }
 
   $order->SalesOrderLines = $line_items->SalesOrderLines;

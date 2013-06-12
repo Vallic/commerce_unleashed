@@ -307,18 +307,22 @@ function commerce_unleashed_order_views_default_views() {
     'show_single_product_attributes' => 0,
     'line_item_type' => 0,
   );
-  /* Field: Commerce Line item: Shipping service */
-  $handler->display->display_options['fields']['commerce_shipping_service']['id'] = 'commerce_shipping_service';
-  $handler->display->display_options['fields']['commerce_shipping_service']['table'] = 'field_data_commerce_shipping_service';
-  $handler->display->display_options['fields']['commerce_shipping_service']['field'] = 'commerce_shipping_service';
-  $handler->display->display_options['fields']['commerce_shipping_service']['relationship'] = 'commerce_line_items_line_item_id';
-  $handler->display->display_options['fields']['commerce_shipping_service']['label'] = 'Product';
-  $handler->display->display_options['fields']['commerce_shipping_service']['element_type'] = '0';
-  $handler->display->display_options['fields']['commerce_shipping_service']['element_wrapper_type'] = '0';
-  $handler->display->display_options['fields']['commerce_shipping_service']['element_default_classes'] = FALSE;
-  $handler->display->display_options['fields']['commerce_shipping_service']['hide_empty'] = TRUE;
-  $handler->display->display_options['fields']['commerce_shipping_service']['type'] = 'list_key';
-  $handler->display->display_options['fields']['commerce_shipping_service']['field_api_classes'] = TRUE;
+
+  if (module_exists('commerce_shipping')) {
+    /* Field: Commerce Line item: Shipping service */
+    $handler->display->display_options['fields']['commerce_shipping_service']['id'] = 'commerce_shipping_service';
+    $handler->display->display_options['fields']['commerce_shipping_service']['table'] = 'field_data_commerce_shipping_service';
+    $handler->display->display_options['fields']['commerce_shipping_service']['field'] = 'commerce_shipping_service';
+    $handler->display->display_options['fields']['commerce_shipping_service']['relationship'] = 'commerce_line_items_line_item_id';
+    $handler->display->display_options['fields']['commerce_shipping_service']['label'] = 'Product  ';
+    $handler->display->display_options['fields']['commerce_shipping_service']['element_type'] = '0';
+    $handler->display->display_options['fields']['commerce_shipping_service']['element_wrapper_type'] = '0';
+    $handler->display->display_options['fields']['commerce_shipping_service']['element_default_classes'] = FALSE;
+    $handler->display->display_options['fields']['commerce_shipping_service']['hide_empty'] = TRUE;
+    $handler->display->display_options['fields']['commerce_shipping_service']['type'] = 'list_key';
+    $handler->display->display_options['fields']['commerce_shipping_service']['field_api_classes'] = TRUE;
+  }
+
   /* Contextual filter: Commerce Order: Order ID */
   $handler->display->display_options['arguments']['order_id']['id'] = 'order_id';
   $handler->display->display_options['arguments']['order_id']['table'] = 'commerce_order';
