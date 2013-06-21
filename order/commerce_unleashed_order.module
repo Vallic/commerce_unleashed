@@ -17,6 +17,12 @@ function commerce_unleashed_order_post($commerce_order) {
   $order->Customer = new stdClass();
   $order->Customer->Guid = $owner->uuid;
 
+  if (isset($order->CurrencyCode)) {
+    $order->Currency = new stdClass();
+    $order->Currency->CurrencyCode = $order->CurrencyCode;
+    unset($order->CurrencyCode);
+  }
+
   $line_items = views_json_get('unleashed_line_item_json', 'default', array($commerce_order->order_id));
 
   foreach ($line_items->SalesOrderLines as $key => $SalesOrderLine) {

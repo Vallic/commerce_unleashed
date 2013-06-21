@@ -128,6 +128,13 @@ function commerce_unleashed_field_formatter_info() {
         'calculation' => FALSE,
       ),
     ),
+    'commerce_unleashed_currency_code' => array(
+      'label' => t('Currency code'),
+      'field types' => array('commerce_price'),
+      'settings' => array(
+        'calculation' => FALSE,
+      ),
+    ),
   );
 }
 
@@ -149,6 +156,11 @@ function commerce_unleashed_field_formatter_view($entity_type, $entity, $field, 
       case 'commerce_unleashed_amount_without_currency':
         $element[$delta] = array(
         '#markup' => commerce_currency_amount_to_decimal($item['amount'], $item['currency_code']),
+        );
+        break;
+      case 'commerce_unleashed_currency_code':
+        $element[$delta] = array(
+        '#markup' => $item['currency_code'],
         );
         break;
     }
