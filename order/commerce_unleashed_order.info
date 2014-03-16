@@ -8,7 +8,4 @@ dependencies[] = commerce_order
 dependencies[] = commerce_product
 dependencies[] = commerce_unleashed
 dependencies[] = commerce_unleashed_customer
-dependencies[] = commerce_uuid
-dependencies[] = commerce_uuid_order
-dependencies[] = commerce_uuid_line_item
 dependencies[] = views_json

@@ -34,7 +34,7 @@ function commerce_unleashed_settings_form($form_state) {
   );
 
   $form['commerce_unleashed_log'] = array(
-    '#type' => 'boolian',
+    '#type' => 'checkbox',
     '#title' => t('Enable Logging'),
     '#default_value' => variable_get('commerce_unleashed_log', FALSE),
     '#description' => t('Log API request in the watchdog.'),
