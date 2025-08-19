@@ -1,0 +1,9 @@
+name: Commerce Unleashed
+type: module
+description: 'Provides Commerce integration for Unleashed - https://www.unleashedsoftware.com.'
+package: Commerce (contrib)
+core_version_requirement: ^10 | ^11
+dependencies:
+  - commerce_product:commerce_product
+  - commerce_order:commerce_order
+  - advancedqueue:advancedqueue

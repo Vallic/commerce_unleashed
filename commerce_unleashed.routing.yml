@@ -1,0 +1,7 @@
+commerce_unleashed.settings:
+  path: '/admin/commerce/config/unleashed'
+  defaults:
+    _form: 'Drupal\commerce_unleashed\Form\SettingsForm'
+    _title: 'Settings'
+  requirements:
+    _permission: 'access commerce administration pages'

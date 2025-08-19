@@ -1,0 +1,28 @@
+<?php
+
+namespace Drupal\commerce_unleashed\Events;
+
+/**
+ * Defines events for the Commerce Unleashed module.
+ */
+final class UnleashedEvents {
+
+  /**
+   * Name of the event fired when sending product variation to Unleashed.
+   *
+   * @Event
+   *
+   * @see \Drupal\commerce_unleashed\Events\UnleashedProductVariationEvent
+   */
+  const string UNLEASHED_PRODUCT_VARIATION = 'commerce_unleashed.event.product_variation';
+
+  /**
+   * Name of the event fired when sending order to Unleashed.
+   *
+   * @Event
+   *
+   * @see \Drupal\commerce_unleashed\Events\UnleashedOrderEvent
+   */
+  const string UNLEASHED_PURCHASE_ORDER = 'commerce_unleashed.event.order';
+
+}

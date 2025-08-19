@@ -1,0 +1,15 @@
+services:
+  commerce_unleashed.sync_subscriber:
+    class: Drupal\commerce_unleashed\EventSubscriber\UnleasedSyncSubscriber
+    arguments: [ '@entity_type.manager' ]
+    tags:
+      - { name: event_subscriber }
+  commerce_unleashed.manager:
+    class: Drupal\commerce_unleashed\UnleashedManager
+    arguments: [ '@entity_type.manager', '@config.factory', '@event_dispatcher', '@date.formatter', '@database' ]
+  commerce_unleashed.availability_checker:
+    class: Drupal\commerce_unleashed\UnleashedAvailabilityChecker
+    arguments:
+      [ '@commerce_unleashed.manager' ]
+    tags:
+      - { name: commerce_order.availability_checker }
