@@ -19,7 +19,6 @@ class UnleasedSyncSubscriber implements EventSubscriberInterface {
     return [
       'commerce_order.place.post_transition' => ['onOrderPlace'],
       'commerce_product.commerce_product_variation.presave' => ['onVariationSave'],
-      'commerce_product.commerce_product_variation.create' => ['onVariationCreate'],
     ];
   }
 
@@ -31,17 +30,6 @@ class UnleasedSyncSubscriber implements EventSubscriberInterface {
     $order_type = $this->entityTypeManager->getStorage('commerce_order_type')->load($order->bundle());
     if ($order_type->getThirdPartySetting('commerce_unleashed', 'sync', 0)) {
       $this->queueSyncJob($order->id(), $order->getEntityTypeId());
-    }
-  }
-
-  /**
-   * Sync on variation create.
-   */
-  public function onVariationCreate(ProductVariationEvent $event) {
-    $product_variation = $event->getProductVariation();
-    $product_variation_type = $this->entityTypeManager->getStorage('commerce_order_type')->load($product_variation->bundle());
-    if ($product_variation_type->getThirdPartySetting('commerce_unleashed', 'sync', 0)) {
-      $this->queueSyncJob($product_variation->id(), $product_variation->getEntityTypeId());
     }
   }
 
