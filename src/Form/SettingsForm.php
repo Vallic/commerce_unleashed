@@ -52,6 +52,15 @@ class SettingsForm extends ConfigFormBase {
   public function buildForm(array $form, FormStateInterface $form_state): array {
     $config = $this->config('commerce_unleashed.settings');
 
+    $form['help'] = [
+      '#type' => 'markup',
+      '#markup' => '<div class="messages messages--info">' . 
+        $this->t('To obtain your API credentials, please visit the <a href="@url" target="_blank">Unleashed API Integration page</a> and follow the instructions to generate your API ID and API Key.', [
+          '@url' => 'https://au.unleashedsoftware.com/v2/Integration/Api'
+        ]) . '</div>',
+      '#weight' => -10,
+    ];
+
     $form['api_id'] = [
       '#type' => 'textfield',
       '#title' => $this->t('API ID'),
