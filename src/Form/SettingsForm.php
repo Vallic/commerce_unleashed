@@ -17,11 +17,11 @@ class SettingsForm extends ConfigFormBase {
   /**
    * Construct UnleashedSettingsForm class.
    */
-  public function __construct(protected ConfigFactoryInterface $config_factory, protected TypedConfigManagerInterface $typedConfigManager, protected EntityTypeManagerInterface $entityTypeManager) {
+  public function __construct(ConfigFactoryInterface $config_factory, TypedConfigManagerInterface $typedConfigManager, protected EntityTypeManagerInterface $entityTypeManager) {
     parent::__construct($config_factory, $typedConfigManager);
   }
 
-  /**
+    /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container) {

@@ -37,11 +37,13 @@ class UnleasedSyncSubscriber implements EventSubscriberInterface {
   /**
    * Sync on variation create.
    */
-  public function onVariationCreate(ProductVariationEvent $event) {
+  public function onVariationCreate(ProductVariationEvent $event): void {
     $product_variation = $event->getProductVariation();
-    $product_variation_type = $this->entityTypeManager->getStorage('commerce_order_type')->load($product_variation->bundle());
-    if ($product_variation_type->getThirdPartySetting('commerce_unleashed', 'sync', 0)) {
-      $this->queueSyncJob($product_variation->id(), $product_variation->getEntityTypeId());
+    $product_variation_type = $this->entityTypeManager->getStorage('commerce_product_variation_type')->load($product_variation->bundle());
+
+    // Add null check as a safety measure
+    if ($product_variation_type && $product_variation_type->getThirdPartySetting('commerce_unleashed', 'sync', 0)) {
+        $this->queueSyncJob($product_variation->id(), $product_variation->getEntityTypeId());
     }
   }
 
