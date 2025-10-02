@@ -213,7 +213,16 @@ class SettingsForm extends ConfigFormBase {
     $form['stock']['availability'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Enforce stock availability'),
+      '#description' => $this->t('It is applied to any SKU which have entry in the table. If there is no entry for stock, product is not considered to be managed by Unleashed.'),
       '#default_value' => $config->get('stock.availability') ?? FALSE,
+      '#required' => FALSE,
+    ];
+
+    $form['stock']['local'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Update local stock after order placement'),
+      '#description' => $this->t('Update local stock table after order is placed. The cron periodically updates stock, but to keep more in sync in real time with less calls to Unleashed API.'),
+      '#default_value' => $config->get('stock.local') ?? FALSE,
       '#required' => FALSE,
     ];
 

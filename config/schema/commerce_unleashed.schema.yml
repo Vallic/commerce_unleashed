@@ -32,9 +32,6 @@ commerce_unleashed.settings:
         currency_code:
           type: string
           label: 'Default currency code'
-        supplier_code:
-          type: string
-          label: 'Default supplier code'
     purchase_orders:
       type: mapping
       mapping:
@@ -46,6 +43,9 @@ commerce_unleashed.settings:
           label: Order types
           mapping:
             type: string
+        supplier_code:
+          type: string
+          label: 'Default supplier code'
     stock:
       type: mapping
       mapping:
@@ -55,3 +55,6 @@ commerce_unleashed.settings:
         availability:
           type: boolean
           label: 'Enforce stock availability'
+        local:
+          type: boolean
+          label: 'Perform local stock updates'

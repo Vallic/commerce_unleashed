@@ -1,6 +1,6 @@
 services:
   commerce_unleashed.sync_subscriber:
-    class: Drupal\commerce_unleashed\EventSubscriber\UnleasedSyncSubscriber
+    class: Drupal\commerce_unleashed\EventSubscriber\UnleashedSyncSubscriber
     arguments: [ '@entity_type.manager', '@config.factory' ]
     tags:
       - { name: event_subscriber }

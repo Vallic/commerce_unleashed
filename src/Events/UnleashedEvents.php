@@ -8,6 +8,15 @@ namespace Drupal\commerce_unleashed\Events;
 final class UnleashedEvents {
 
   /**
+   * Name of the event fired before creating queue item.
+   *
+   * @Event
+   *
+   * @see \Drupal\commerce_unleashed\Events\UnleashedSyncEvent
+   */
+  const UNLEASHED_SYNC_EVENT = 'commerce_unleashed.event.sync';
+
+  /**
    * Name of the event fired when sending product variation to Unleashed.
    *
    * @Event

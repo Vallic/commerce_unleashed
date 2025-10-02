@@ -101,7 +101,7 @@ class UnleashedClient {
    * @see https://apidocs.unleashedsoftware.com/Products
    */
   public function getProductBySku($sku): array {
-    return $this->request('GET', 'Products?productCode=' . $sku);
+    return $this->request('GET', 'Products', [], 'productCode=' . $sku);
   }
 
   /**

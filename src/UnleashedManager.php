@@ -10,6 +10,8 @@ use Drupal\commerce_product\Entity\ProductVariationInterface;
 use Drupal\commerce_unleashed\Events\UnleashedEvents;
 use Drupal\commerce_unleashed\Events\UnleashedOrderEvent;
 use Drupal\commerce_unleashed\Events\UnleashedProductVariationEvent;
+use Drupal\commerce_unleashed\Events\UnleashedSyncEvent;
+use Drupal\Component\Serialization\Json;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Datetime\DateFormatterInterface;
@@ -44,6 +46,12 @@ class UnleashedManager implements UnleashedManagerInterface {
     $page_number = $products['Pagination']['PageNumber'];
     if (!empty($products['Items'])) {
       foreach ($products['Items'] as $product) {
+
+        $unleashed_sync_event = new UnleashedSyncEvent($product);
+        $this->eventDispatcher->dispatch($unleashed_sync_event, UnleashedEvents::UNLEASHED_SYNC_EVENT);
+        if ($unleashed_sync_event->skipSync()) {
+          continue;
+        }
         $this->queueSyncJob($product);
       }
 
@@ -61,6 +69,11 @@ class UnleashedManager implements UnleashedManagerInterface {
 
     if (!empty($products['Items'])) {
       foreach ($products['Items'] as $product) {
+        $unleashed_sync_event = new UnleashedSyncEvent($product);
+        $this->eventDispatcher->dispatch($unleashed_sync_event, UnleashedEvents::UNLEASHED_SYNC_EVENT);
+        if ($unleashed_sync_event->skipSync()) {
+          continue;
+        }
         $this->queueSyncJob($product);
       }
     }
@@ -104,6 +117,8 @@ class UnleashedManager implements UnleashedManagerInterface {
         'title' => $payload['ProductDescription'],
         'stores' => [$settings->get('products.store')],
         'variations' => [$product_variation->id()],
+        // Keep them unpublished.
+        'status' => 0,
       ]);
       $product->save();
     }
