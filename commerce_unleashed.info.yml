@@ -4,6 +4,6 @@ description: 'Provides Commerce integration for Unleashed - https://www.unleashe
 package: Commerce (contrib)
 core_version_requirement: ^10 | ^11
 dependencies:
-  - commerce_product:commerce_product
-  - commerce_order:commerce_order
+  - commerce:commerce_product
+  - commerce:commerce_order
   - advancedqueue:advancedqueue
