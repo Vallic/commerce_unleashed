@@ -1,7 +1,0 @@
-name = Commerce Unleashed Customer
-description = Intergration with Unleashed Software for customers.
-core = 7.x
-package = Commerce Unleashed
-
-dependencies[] = commerce_unleashed
-dependencies[] = views_json

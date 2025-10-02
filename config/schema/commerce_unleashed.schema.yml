@@ -1,0 +1,57 @@
+commerce_unleashed.settings:
+  type: config_object
+  label: 'Unleashed settings'
+  mapping:
+    logging:
+      type: boolean
+      label: 'Log requests'
+    api_id:
+      type: string
+      label: 'API ID'
+    api_key:
+      type: string
+      label: 'API Key'
+    products:
+      type: mapping
+      mapping:
+        sync:
+          type: boolean
+          label: 'Sync products'
+        cron:
+          type: boolean
+          label: 'Cron sync'
+        full:
+          type: boolean
+          label: 'Full sync'
+        type:
+          type: string
+          label: 'Default variation type'
+        store:
+          type: string
+          label: 'Default store'
+        currency_code:
+          type: string
+          label: 'Default currency code'
+        supplier_code:
+          type: string
+          label: 'Default supplier code'
+    purchase_orders:
+      type: mapping
+      mapping:
+        sync:
+          type: boolean
+          label: 'Sync orders'
+        types:
+          type: sequence
+          label: Order types
+          mapping:
+            type: string
+    stock:
+      type: mapping
+      mapping:
+        sync:
+          type: boolean
+          label: 'Sync stock'
+        availability:
+          type: boolean
+          label: 'Enforce stock availability'

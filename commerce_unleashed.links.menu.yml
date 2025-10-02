@@ -1,0 +1,6 @@
+commerce_unleashed.settings:
+  title: 'Unleashed'
+  route_name: commerce_unleashed.settings
+  parent: 'commerce.store_configuration'
+  description: 'Unleashed Commerce Core integration'
+  weight: -20

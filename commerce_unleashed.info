@@ -1,7 +1,0 @@
-name = Commerce Unleashed
-description = Intergration with Unleashed Software.
-core = 7.x
-package = Commerce Unleashed
-
-dependencies[] = commerce
-dependencies[] = commerce_uuid

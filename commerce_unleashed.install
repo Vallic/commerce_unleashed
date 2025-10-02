@@ -1,0 +1,66 @@
+<?php
+
+/**
+ * @file
+ * The install file.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function commerce_unleashed_schema(): array {
+  $schema['commerce_unleashed_stock_on_hand'] = [
+    'description' => 'Table used for tracking Unleashed stock',
+    'fields' => [
+      'id' => [
+        'description' => 'Primary Key: id.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+      'ProductCode' => [
+        'description' => 'The SKU. Product code at Unleashed.',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+      ],
+      'AllocatedQty' => [
+        'description' => 'The allocated quantity ',
+        'type' => 'varchar',
+        'length' => 16,
+        'not null' => TRUE,
+      ],
+      'AvailableQty' => [
+        'description' => 'The available quantity ',
+        'type' => 'varchar',
+        'length' => 16,
+        'not null' => TRUE,
+      ],
+      'QtyOnHand' => [
+        'description' => 'The quantity on hand.',
+        'type' => 'varchar',
+        'length' => 16,
+        'not null' => TRUE,
+      ],
+      'ProductGuid' => [
+        'description' => 'The product variation uuid.',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+      ],
+      'timestamp' => [
+        'description' => 'The date and time that any quantity was last updated.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ],
+    ],
+    'primary key' => ['id'],
+    'indexes' => [
+      'product_code' => ['ProductCode'],
+      'product_guid' => ['ProductGuid'],
+    ],
+  ];
+  return $schema;
+}
