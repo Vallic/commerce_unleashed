@@ -5,3 +5,10 @@ commerce_unleashed.settings:
     _title: 'Settings'
   requirements:
     _permission: 'access commerce administration pages'
+commerce_unleashed.stock_on_hand:
+  path: '/admin/commerce/unleashed'
+  defaults:
+    _controller: '\Drupal\commerce_unleashed\Controller\StockOnHandController::overview'
+    _title: 'Stock on hand'
+  requirements:
+    _permission: 'access commerce administration pages'

@@ -4,3 +4,10 @@ commerce_unleashed.settings:
   parent: 'commerce.store_configuration'
   description: 'Unleashed Commerce Core integration'
   weight: -20
+
+commerce_unleashed.stock_on_hand:
+  title: 'Stock on hand'
+  route_name: commerce_unleashed.stock_on_hand
+  parent: 'commerce.admin_commerce'
+  description: 'Display stock on hand data from Unleashed'
+  weight: -20
