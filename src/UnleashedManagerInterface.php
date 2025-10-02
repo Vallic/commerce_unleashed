@@ -7,7 +7,7 @@ use Drupal\commerce_product\Entity\ProductVariationInterface;
 
 interface UnleashedManagerInterface {
 
-  public const string UNLEASHED_STOCK_TABLE = 'commerce_unleashed_stock_on_hand';
+  public const UNLEASHED_STOCK_TABLE = 'commerce_unleashed_stock_on_hand';
 
   /**
    * Sync all products.

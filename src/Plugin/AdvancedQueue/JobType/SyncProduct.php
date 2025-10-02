@@ -50,8 +50,7 @@ class SyncProduct extends JobTypeBase implements ContainerFactoryPluginInterface
     $payload = $job->getPayload();
 
     try {
-     $this->unleashedManager->processProductSync($payload);
-
+      $this->unleashedManager->processProductSync($payload);
     }
     catch (\Exception $e) {
       return JobResult::failure($e->getMessage());

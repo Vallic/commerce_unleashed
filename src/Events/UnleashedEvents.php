@@ -14,7 +14,7 @@ final class UnleashedEvents {
    *
    * @see \Drupal\commerce_unleashed\Events\UnleashedProductVariationEvent
    */
-  const string UNLEASHED_PRODUCT_VARIATION = 'commerce_unleashed.event.product_variation';
+  const UNLEASHED_PRODUCT_VARIATION = 'commerce_unleashed.event.product_variation';
 
   /**
    * Name of the event fired when sending order to Unleashed.
@@ -23,6 +23,6 @@ final class UnleashedEvents {
    *
    * @see \Drupal\commerce_unleashed\Events\UnleashedOrderEvent
    */
-  const string UNLEASHED_PURCHASE_ORDER = 'commerce_unleashed.event.order';
+  const UNLEASHED_PURCHASE_ORDER = 'commerce_unleashed.event.order';
 
 }

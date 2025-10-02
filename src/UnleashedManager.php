@@ -113,7 +113,7 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function syncOrder(OrderInterface $order): array {
-    $order_type = $this->entityTypeManager->getStorage('commerce_order_type')->load($order->bundle());
+    $settings = $this->configFactory->get('commerce_unleashed.settings');
     $currency = $order->getTotalPrice()->getCurrencyCode();
     $payload = [
       'Guid' => $order->uuid(),
@@ -121,7 +121,7 @@ class UnleashedManager implements UnleashedManagerInterface {
       'OrderStatus' => 'Placed',
       'SubTotal' => $order->getSubtotalPrice()->getNumber(),
       'Supplier' => [
-        'SupplierCode' => $order_type->getThirdPartySetting('commerce_unleashed', 'supplier_code', ''),
+        'SupplierCode' => $settings->get('purchase_orders.supplier_code'),
       ],
       'Total' => $order->getTotalPrice()->getNumber(),
       'OrderDate' => $this->dateFormatter->format($order->getCreatedTime(), 'custom', 'Y-m-d\\TH:i:s', 'UTC'),

@@ -14,7 +14,7 @@ class UnleashedClient {
 
   protected ClientInterface $client;
 
-  public const string UNLEASHED_API = 'https://api.unleashedsoftware.com/';
+  public const UNLEASHED_API = 'https://api.unleashedsoftware.com/';
 
   public function __construct(protected string $apiId, protected string $apiKey, protected bool $logging = FALSE) {
     $this->client = new Client();
@@ -92,9 +92,8 @@ class UnleashedClient {
    * @see https://apidocs.unleashedsoftware.com/Products
    */
   public function getProduct($guid): array {
-    return $this->request('GET', 'Products/'. $guid);
+    return $this->request('GET', 'Products/' . $guid);
   }
-
 
   /**
    * Get single product by guid.
@@ -183,7 +182,7 @@ class UnleashedClient {
    * @see https://apidocs.unleashedsoftware.com/Customers
    */
   public function getCustomer($guid): array {
-    return $this->request('GET', 'Customers/' .$guid);
+    return $this->request('GET', 'Customers/' . $guid);
   }
 
   /**
