@@ -195,6 +195,14 @@ class SettingsForm extends ConfigFormBase {
       '#required' => FALSE,
     ];
 
+    $form['purchase_orders']['complete'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Complete orders from Drupal'),
+      '#description' => $this->t('Once the order is completed in Drupal, send an complete call to Unleashed'),
+      '#default_value' => $config->get('purchase_orders.complete') ?? FALSE,
+      '#required' => FALSE,
+    ];
+
     $form['stock'] = [
       '#type' => 'details',
       '#title' => 'Stock on hand',

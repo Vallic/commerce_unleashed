@@ -46,6 +46,9 @@ commerce_unleashed.settings:
         supplier_code:
           type: string
           label: 'Default supplier code'
+        complete:
+          type: boolean
+          label: 'Complete order'
     stock:
       type: mapping
       mapping:

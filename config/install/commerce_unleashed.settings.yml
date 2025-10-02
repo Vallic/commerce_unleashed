@@ -16,3 +16,4 @@ purchase_orders:
 stock:
   sync: false
   availability: false
+  local: false

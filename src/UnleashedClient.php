@@ -168,6 +168,15 @@ class UnleashedClient {
   }
 
   /**
+   * Complete purchase order.
+   *
+   * @see https://apidocs.unleashedsoftware.com/Purchases
+   */
+  public function deletePurchaseOrder($guid): void {
+    $this->request('DELETE', 'PurchaseOrders/' . $guid);
+  }
+
+  /**
    * Returns customers, paginated.
    *
    * @see https://apidocs.unleashedsoftware.com/Customers

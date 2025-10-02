@@ -5,6 +5,10 @@
  * Main file.
  */
 
+use Drupal\commerce_cart\Form\AddToCartFormInterface;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+
 /**
  * Implements hook_cron().
  */
@@ -31,3 +35,26 @@ function commerce_unleashed_cron(): void {
   }
 }
 
+/**
+ * Implements hook_form_BASE_FORM_ID_alter() for 'commerce_order_item_add_to_cart_form'.
+ */
+function commerce_unleashed_form_commerce_order_item_add_to_cart_form_alter(&$form, FormStateInterface $form_state): void {
+  $form_object = $form_state->getFormObject();
+
+  if ($form_object instanceof AddToCartFormInterface) {
+    /** @var \Drupal\commerce_unleashed\UnleashedManagerInterface $unleashed_manager */
+    $unleashed_manager = \Drupal::service('commerce_unleashed.manager');
+
+    // Get order item from the form.
+    /** @var \Drupal\commerce_order\Entity\OrderItemInterface $order_item */
+    $order_item = $form_object->getEntity();
+
+    // Purchasable entity to be used in the form.
+    if ($purchased_entity = $order_item->getPurchasedEntity()) {
+      if ($unleashed_manager->getStockOnHand($purchased_entity) === 0) {
+        $form['actions']['submit']['#disabled'] = TRUE;
+        $form['actions']['submit']['#value'] = new TranslatableMarkup('Sold out');
+      }
+    }
+  }
+}

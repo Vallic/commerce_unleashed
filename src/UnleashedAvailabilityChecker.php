@@ -30,15 +30,9 @@ class UnleashedAvailabilityChecker implements AvailabilityCheckerInterface {
     if ($this->unleashedManager->enforceStockAvailability()) {
       $purchased_entity = $order_item->getPurchasedEntity();
       $on_hand = $this->unleashedManager->getStockOnHand($purchased_entity);
-      // Maybe not all products are synced via Unleashed.
-      if (is_null($on_hand)) {
-        return AvailabilityResult::neutral();
+      if ($on_hand === 0) {
+        return AvailabilityResult::unavailable('Out of stock');
       }
-      if ($on_hand > 0) {
-        return AvailabilityResult::neutral();
-      }
-
-      return new AvailabilityResult(FALSE, 'Out of stock');
     }
 
     return AvailabilityResult::neutral();

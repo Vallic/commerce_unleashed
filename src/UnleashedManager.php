@@ -11,8 +11,8 @@ use Drupal\commerce_unleashed\Events\UnleashedEvents;
 use Drupal\commerce_unleashed\Events\UnleashedOrderEvent;
 use Drupal\commerce_unleashed\Events\UnleashedProductVariationEvent;
 use Drupal\commerce_unleashed\Events\UnleashedSyncEvent;
-use Drupal\Component\Serialization\Json;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Config\ImmutableConfig;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Datetime\DateFormatterInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -25,6 +25,8 @@ class UnleashedManager implements UnleashedManagerInterface {
 
   protected UnleashedClient $unleashedClient;
 
+  protected ImmutableConfig $unleashedSettings;
+
   public function __construct(protected EntityTypeManagerInterface $entityTypeManager, protected ConfigFactoryInterface $configFactory, protected EventDispatcherInterface $eventDispatcher, protected DateFormatterInterface $dateFormatter, protected Connection $connection) {
     $this->unleashedClient = $this->getClient();
   }
@@ -32,9 +34,8 @@ class UnleashedManager implements UnleashedManagerInterface {
   /**
    * Setup http client.
    */
-  protected function getClient(): UnleashedClient {
-    $settings = $this->configFactory->get('commerce_unleashed.settings');
-    return new UnleashedClient($settings->get('api_id') ?? 'empty', $settings->get('api_key') ?? 'empty', (bool) $settings->get('logging'));
+  public function getClient(): UnleashedClient {
+    return new UnleashedClient($this->getApiId(), $this->getApiKey(), $this->getLogging());
   }
 
   /**
@@ -83,15 +84,15 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function processProductSync(array $payload): void {
-    $settings = $this->configFactory->get('commerce_unleashed.settings');
     /** @var \Drupal\commerce_product\ProductVariationStorageInterface $product_variation_storage */
     $product_variation_storage = $this->entityTypeManager->getStorage('commerce_product_variation');
 
+    $save = TRUE;
     $product_variation = $product_variation_storage->loadBySku($payload['ProductCode']);
-    $price = new Price((string) $payload['DefaultSellPrice'], $settings->get('products.currency_code'));
+    $price = new Price((string) $payload['DefaultSellPrice'], $this->getCurrencyCode());
     if (!$product_variation) {
       $product_variation = $product_variation_storage->create([
-        'type' => $settings->get('products.type'),
+        'type' => $this->getVariationType(),
         'sku' => $payload['ProductCode'],
         'title' => $payload['ProductDescription'],
         'price' => $price,
@@ -99,23 +100,31 @@ class UnleashedManager implements UnleashedManagerInterface {
     }
     // TBD: what we do update by default on regular sync.
     else {
-      $product_variation->setPrice($price);
+      $compare = $product_variation->getPrice()?->compareTo($price);
+      if (!empty($compare)) {
+        $product_variation->setPrice($price);
+      }
+      else {
+        $save = FALSE;
+      }
     }
 
-    if ($settings->get('products.full')) {
+    if ($this->syncFullProduct()) {
       $payload = $this->unleashedClient->getProduct($payload['Guid']);
     }
 
     $unleashed_product_event = new UnleashedProductVariationEvent($product_variation, $payload);
     $this->eventDispatcher->dispatch($unleashed_product_event, UnleashedEvents::UNLEASHED_PRODUCT_VARIATION);
     $product_variation = $unleashed_product_event->getProductVariation();
-    $product_variation->save();
+    if ($save) {
+      $product_variation->save();
+    }
 
     if (!$product_variation->getProduct()) {
       $product = Product::create([
-        'type' => $settings->get('products.type'),
+        'type' => $this->getVariationType(),
         'title' => $payload['ProductDescription'],
-        'stores' => [$settings->get('products.store')],
+        'stores' => [$this->getStoreId()],
         'variations' => [$product_variation->id()],
         // Keep them unpublished.
         'status' => 0,
@@ -128,7 +137,6 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function syncOrder(OrderInterface $order): array {
-    $settings = $this->configFactory->get('commerce_unleashed.settings');
     $currency = $order->getTotalPrice()->getCurrencyCode();
     $payload = [
       'Guid' => $order->uuid(),
@@ -136,7 +144,7 @@ class UnleashedManager implements UnleashedManagerInterface {
       'OrderStatus' => 'Placed',
       'SubTotal' => $order->getSubtotalPrice()->getNumber(),
       'Supplier' => [
-        'SupplierCode' => $settings->get('purchase_orders.supplier_code'),
+        'SupplierCode' => $this->getSupplierCode(),
       ],
       'Total' => $order->getTotalPrice()->getNumber(),
       'OrderDate' => $this->dateFormatter->format($order->getCreatedTime(), 'custom', 'Y-m-d\\TH:i:s', 'UTC'),
@@ -220,13 +228,6 @@ class UnleashedManager implements UnleashedManagerInterface {
   /**
    * {@inheritdoc}
    */
-  public function completePurchaseOrder(OrderInterface $order): void {
-    $this->unleashedClient->completePurchaseOrder($order->uuid());
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function syncStockOnHand($page_number = NULL): void {
     $data = $this->unleashedClient->getStockOnHand('pageSize=100', $page_number);
     $pages = $data['Pagination']['NumberOfPages'];
@@ -251,15 +252,152 @@ class UnleashedManager implements UnleashedManagerInterface {
   /**
    * {@inheritdoc}
    */
-  public function getStockOnHand(ProductVariationInterface $product_variation): ?float {
-    return $this->connection->select(self::UNLEASHED_STOCK_TABLE, 's')->fields('s', ['QtyOnHand'])->condition('ProductCode', $product_variation->getSku())->execute()->fetchField();
+  public function getStockOnHand(ProductVariationInterface $product_variation): int {
+    $stock = $this->connection->select(self::UNLEASHED_STOCK_TABLE, 's')->fields('s', ['QtyOnHand'])->condition('ProductCode', $product_variation->getSku())->execute()->fetchField();
+    return $stock ? (int) $stock : UnleashedManagerInterface::UNLEASHED_NON_MANAGED;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function updateLocalStockOnHand(ProductVariationInterface $product_variation, $quantity): void {
+    $stock = $this->getStockOnHand($product_variation);
+    if ($stock > 0) {
+      $this->connection->merge(self::UNLEASHED_STOCK_TABLE)->fields([
+        'QtyOnHand' => $stock - $quantity,
+        'timestamp' => time(),
+      ])->condition('ProductCode', $product_variation->getSku())->execute();
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getApiId(): string {
+    return $this->unleashedSettings()->get('api_id');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getApiKey(): string {
+    return $this->unleashedSettings()->get('api_key');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getLogging(): bool {
+    return (bool) $this->unleashedSettings()->get('logging');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function syncInventory(): bool {
+    return (bool) $this->unleashedSettings()->get('products.sync');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function syncFullProduct(): bool {
+    return (bool) $this->unleashedSettings()->get('products.full');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function syncOnCron(): bool {
+    return (bool) $this->unleashedSettings()->get('products.cron');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getVariationType(): string {
+    return $this->unleashedSettings()->get('products.type');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getStoreId(): string {
+    return $this->unleashedSettings()->get('products.store');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCurrencyCode(): string {
+    return $this->unleashedSettings()->get('products.currency_code ');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function syncOrders(): bool {
+    return (bool) $this->unleashedSettings()->get('purchase_orders.sync');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function syncOrderType(string $bundle): bool {
+    $types = $this->unleashedSettings()->get('purchase_orders.types');
+    return !empty($types[$bundle]);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isOrderEligible(OrderInterface $order): bool {
+    return $this->syncOrders() && $this->syncOrderType($order->bundle());
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getSupplierCode(): string {
+    return $this->unleashedSettings()->get('purchase_orders.supplier_code') ?? '';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function completeOrders(): bool {
+    return (bool) $this->unleashedSettings()->get('purchase_orders.complete');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function syncStock(): bool {
+    return (bool) $this->unleashedSettings()->get('stock.sync');
   }
 
   /**
    * {@inheritdoc}
    */
   public function enforceStockAvailability(): bool {
-    return $this->configFactory->get('commerce_unleashed.settings')->get('stock.availability');
+    return (bool) $this->unleashedSettings()->get('stock.availability');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function updateLocalStock(): bool {
+    return (bool) $this->unleashedSettings()->get('stock.local');
+  }
+
+  /**
+   * Retrieve configuration.
+   */
+  protected function unleashedSettings(): ImmutableConfig {
+    if (empty($this->unleashedSettings)) {
+      $this->unleashedSettings = $this->configFactory->get('commerce_unleashed.settings');
+    }
+    return $this->unleashedSettings;
   }
 
   /**
