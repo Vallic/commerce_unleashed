@@ -330,7 +330,7 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function getCurrencyCode(): string {
-    return $this->unleashedSettings()->get('products.currency_code ');
+    return $this->unleashedSettings()->get('products.currency_code');
   }
 
   /**
