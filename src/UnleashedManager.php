@@ -254,7 +254,7 @@ class UnleashedManager implements UnleashedManagerInterface {
    */
   public function getStockOnHand(ProductVariationInterface $product_variation): int {
     $stock = $this->connection->select(self::UNLEASHED_STOCK_TABLE, 's')->fields('s', ['AvailableQty'])->condition('ProductCode', $product_variation->getSku())->execute()->fetchField();
-    return $stock ? (int) $stock : UnleashedManagerInterface::UNLEASHED_NON_MANAGED;
+    return !is_null($stock) ? (int) $stock : UnleashedManagerInterface::UNLEASHED_NON_MANAGED;
   }
 
   /**
