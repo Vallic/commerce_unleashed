@@ -45,15 +45,17 @@ function commerce_unleashed_form_commerce_order_item_add_to_cart_form_alter(&$fo
     /** @var \Drupal\commerce_unleashed\UnleashedManagerInterface $unleashed_manager */
     $unleashed_manager = \Drupal::service('commerce_unleashed.manager');
 
-    // Get order item from the form.
-    /** @var \Drupal\commerce_order\Entity\OrderItemInterface $order_item */
-    $order_item = $form_object->getEntity();
+    if ($unleashed_manager->enforceStockAvailability()) {
+      // Get order item from the form.
+      /** @var \Drupal\commerce_order\Entity\OrderItemInterface $order_item */
+      $order_item = $form_object->getEntity();
 
-    // Purchasable entity to be used in the form.
-    if ($purchased_entity = $order_item->getPurchasedEntity()) {
-      if ($unleashed_manager->getStockOnHand($purchased_entity) === 0) {
-        $form['actions']['submit']['#disabled'] = TRUE;
-        $form['actions']['submit']['#value'] = new TranslatableMarkup('Sold out');
+      // Purchasable entity to be used in the form.
+      if ($purchased_entity = $order_item->getPurchasedEntity()) {
+        if ($unleashed_manager->getStockOnHand($purchased_entity) === 0) {
+          $form['actions']['submit']['#disabled'] = TRUE;
+          $form['actions']['submit']['#value'] = new TranslatableMarkup('Sold out');
+        }
       }
     }
   }
