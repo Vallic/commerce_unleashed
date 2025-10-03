@@ -253,7 +253,7 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function getStockOnHand(ProductVariationInterface $product_variation): int {
-    $stock = $this->connection->select(self::UNLEASHED_STOCK_TABLE, 's')->fields('s', ['QtyOnHand'])->condition('ProductCode', $product_variation->getSku())->execute()->fetchField();
+    $stock = $this->connection->select(self::UNLEASHED_STOCK_TABLE, 's')->fields('s', ['AvailableQty'])->condition('ProductCode', $product_variation->getSku())->execute()->fetchField();
     return $stock ? (int) $stock : UnleashedManagerInterface::UNLEASHED_NON_MANAGED;
   }
 
@@ -264,7 +264,7 @@ class UnleashedManager implements UnleashedManagerInterface {
     $stock = $this->getStockOnHand($product_variation);
     if ($stock > 0) {
       $this->connection->merge(self::UNLEASHED_STOCK_TABLE)->fields([
-        'QtyOnHand' => $stock - $quantity,
+        'AvailableQty' => $stock - $quantity,
         'timestamp' => time(),
       ])->condition('ProductCode', $product_variation->getSku())->execute();
     }
