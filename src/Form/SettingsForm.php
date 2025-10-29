@@ -190,9 +190,9 @@ class SettingsForm extends ConfigFormBase {
     $form['purchase_orders']['supplier_code'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Supplier code'),
-      '#description' => $this->t('Default supplier code, if applicable.'),
+      '#description' => $this->t('Default supplier code, required for purchase orders. You can alter it via event subscriber programmatically for any order. @see \Drupal\commerce_unleashed\Events\UnleashedEvents::UNLEASHED_PURCHASE_ORDER'),
       '#default_value' => $config->get('purchase_orders.supplier_code') ?? '',
-      '#required' => FALSE,
+      '#required' => TRUE,
     ];
 
     $form['purchase_orders']['complete'] = [
