@@ -165,8 +165,6 @@ class UnleashedManager implements UnleashedManagerInterface {
       }
     }
 
-    $payload['TaxTotal'] = $tax_total->getNumber();
-
     $payload['DiscountRate'] = $promotion_total->isZero() ? '0.00' : abs($promotion_total->divide($order->getTotalPrice()->getNumber()));
 
     $payload['PurchaseOrderLines'] = [];
@@ -186,10 +184,11 @@ class UnleashedManager implements UnleashedManagerInterface {
         'ReceiptQuantity' => $item->getQuantity(),
       ];
 
-      $tax_total = new Price('0', $currency);
+      $tax_item_total = new Price('0', $currency);
       $promotion_total = new Price('0', $currency);
-      foreach ($order->getAdjustments(['tax', 'promotion']) as $adjustment) {
+      foreach ($item->getAdjustments(['tax', 'promotion']) as $adjustment) {
         if ($adjustment->getType() === 'tax') {
+          $tax_item_total = $tax_item_total->add($adjustment->getAmount());
           $tax_total = $tax_total->add($adjustment->getAmount());
         }
 
@@ -198,11 +197,13 @@ class UnleashedManager implements UnleashedManagerInterface {
         }
       }
 
-      $item_payload['LineTax'] = $tax_total->getNumber();
-      $item_payload['DiscountRate'] = $promotion_total->isZero() ? '0.00' : abs($promotion_total->divide($item->getTotalPrice()->getNumber()));
+      $item_payload['LineTax'] = $tax_item_total->getNumber();
+      $item_payload['DiscountRate'] = $promotion_total->isZero() ? '0.00' : abs($promotion_total->divide($item->getTotalPrice()->getNumber())->getNumber());
 
       $payload['PurchaseOrderLines'][] = $item_payload;
     }
+
+    $payload['TaxTotal'] = $tax_total->getNumber();
 
     $profiles = $order->collectProfiles();
     if (isset($profiles['shipping'])) {
