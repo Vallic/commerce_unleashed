@@ -195,6 +195,14 @@ class SettingsForm extends ConfigFormBase {
       '#required' => TRUE,
     ];
 
+    $form['purchase_orders']['shipping_sku'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Shipping SKU'),
+      '#description' => $this->t('SKU of the product from Unleashed that will be used for shipping.'),
+      '#default_value' => $config->get('purchase_orders.shipping_sku') ?? '',
+      '#required' => TRUE,
+    ];
+
     $form['purchase_orders']['complete'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Complete orders from Drupal'),

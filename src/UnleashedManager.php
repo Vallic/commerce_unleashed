@@ -140,9 +140,8 @@ class UnleashedManager implements UnleashedManagerInterface {
     $currency = $order->getTotalPrice()->getCurrencyCode();
     $payload = [
       'Guid' => $order->uuid(),
-      'OrderNumber' => $order->getOrderNumber(),
+      'OrderNumber' => $order->getOrderNumber() ?? $order->id(),
       'OrderStatus' => 'Placed',
-      'SubTotal' => $order->getSubtotalPrice()->getNumber(),
       'Supplier' => [
         'SupplierCode' => $this->getSupplierCode(),
       ],
@@ -150,22 +149,14 @@ class UnleashedManager implements UnleashedManagerInterface {
       'OrderDate' => $this->dateFormatter->format($order->getCreatedTime(), 'custom', 'Y-m-d\\TH:i:s', 'UTC'),
     ];
 
+    $subtotal = $order->getSubtotalPrice();
+
     if ($placed = $order->getPlacedTime()) {
       $payload['ReceivedDate'] = $this->dateFormatter->format($placed, 'custom', 'Y-m-d\\TH:i:s', 'UTC');
     }
 
     $tax_total = new Price('0', $currency);
     $promotion_total = new Price('0', $currency);
-    foreach ($order->getAdjustments() as $adjustment) {
-      if ($adjustment->getType() === 'tax') {
-        $tax_total = $tax_total->add($adjustment->getAmount());
-      }
-      if ($adjustment->getType() === 'promotion') {
-        $promotion_total = $promotion_total->add($adjustment->getAmount());
-      }
-    }
-
-    $payload['DiscountRate'] = $promotion_total->isZero() ? '0.00' : abs($promotion_total->divide($order->getTotalPrice()->getNumber()));
 
     $payload['PurchaseOrderLines'] = [];
     foreach ($order->getItems() as $item) {
@@ -179,17 +170,70 @@ class UnleashedManager implements UnleashedManagerInterface {
           'CurrencyCode' => $currency,
         ],
         'OrderQuantity' => $item->getQuantity(),
-        'UnitPrice' => $item->getUnitPrice()->getNumber(),
-        'LineTotal' => $item->getTotalPrice()->getNumber(),
         'ReceiptQuantity' => $item->getQuantity(),
       ];
 
+      $unit_price = $item->getUnitPrice();
+      $line_total = $item->getTotalPrice();
+
       $tax_item_total = new Price('0', $currency);
-      $promotion_total = new Price('0', $currency);
+      $promotion_item_total = new Price('0', $currency);
       foreach ($item->getAdjustments(['tax', 'promotion']) as $adjustment) {
         if ($adjustment->getType() === 'tax') {
           $tax_item_total = $tax_item_total->add($adjustment->getAmount());
           $tax_total = $tax_total->add($adjustment->getAmount());
+          $item_payload['TaxRate'] = $adjustment->getPercentage();
+          if ($adjustment->isIncluded()) {
+            $unit_price = $unit_price->subtract($adjustment->getAmount());
+            $line_total = $line_total->subtract($adjustment->getAmount());
+            $subtotal = $subtotal->subtract($adjustment->getAmount());
+          }
+        }
+
+        if ($adjustment->getType() === 'promotion') {
+          $promotion_item_total = $promotion_item_total->add($adjustment->getAmount());
+          $promotion_total = $promotion_total->add($adjustment->getAmount());
+        }
+      }
+
+      $item_payload['UnitPrice'] = $unit_price->getNumber();
+      $item_payload['LineTotal'] = $line_total->getNumber();
+
+      $item_payload['LineTax'] = $tax_item_total->getNumber();
+      $item_payload['DiscountRate'] = $promotion_item_total->isZero() ? '0.00' : abs($promotion_item_total->divide($item->getTotalPrice()->getNumber())->getNumber());
+
+      $payload['PurchaseOrderLines'][] = $item_payload;
+    }
+
+    /** @var \Drupal\commerce_shipping\Entity\ShipmentInterface[] $shipments */
+    $shipments = $order->get('shipments')->referencedEntities();
+
+    foreach ($shipments as $shipment) {
+      $item_payload = [
+        'LineNumber' => time(),
+        'Product' => [
+          'ProductCode' => $this->getShippingSku(),
+        ],
+        'Currency' => [
+          'CurrencyCode' => $currency,
+        ],
+        'OrderQuantity' => 1,
+        'ReceiptQuantity' => 1,
+      ];
+
+      $unit_price = $shipment->getAmount();
+      $line_total = $shipment->getAmount();
+
+      foreach ($shipment->getAdjustments() as $adjustment) {
+        if ($adjustment->getType() === 'tax') {
+          $tax_total = $tax_total->add($adjustment->getAmount());
+          $item_payload['LineTax'] = $adjustment->getAmount()->getNumber();
+          $item_payload['TaxRate'] = $adjustment->getPercentage();
+          // Shipping tax is always included.
+          if ($adjustment->isIncluded()) {
+            $unit_price = $unit_price->subtract($adjustment->getAmount());
+            $line_total = $line_total->subtract($adjustment->getAmount());
+          }
         }
 
         if ($adjustment->getType() === 'promotion') {
@@ -197,14 +241,19 @@ class UnleashedManager implements UnleashedManagerInterface {
         }
       }
 
-      $item_payload['LineTax'] = $tax_item_total->getNumber();
-      $item_payload['DiscountRate'] = $promotion_total->isZero() ? '0.00' : abs($promotion_total->divide($item->getTotalPrice()->getNumber())->getNumber());
+      $item_payload['UnitPrice'] = $unit_price->getNumber();
+      $item_payload['LineTotal'] = $line_total->getNumber();
+      // Unleashed handle shipping as a line item.
+      $subtotal = $subtotal->add($unit_price);
 
       $payload['PurchaseOrderLines'][] = $item_payload;
     }
 
-    $payload['TaxTotal'] = $tax_total->getNumber();
+    $payload['DiscountRate'] = $promotion_total->isZero() ? '0.00' : abs($promotion_total->divide($order->getTotalPrice()->getNumber()));
 
+    $payload['TaxTotal'] = $tax_total->getNumber();
+    $payload['TaxRate'] = $tax_total->isZero() ? '0.00' : round(abs($tax_total->divide($order->getTotalPrice()->subtract($tax_total)->getNumber())->getNumber()), 2, PHP_ROUND_HALF_UP);
+    $payload['Subtotal'] = $subtotal->getNumber();
     $profiles = $order->collectProfiles();
     if (isset($profiles['shipping'])) {
       $shipping = $profiles['shipping'];
@@ -361,6 +410,13 @@ class UnleashedManager implements UnleashedManagerInterface {
    */
   public function getSupplierCode(): string {
     return $this->unleashedSettings()->get('purchase_orders.supplier_code') ?? '';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getShippingSku(): string {
+    return $this->unleashedSettings()->get('purchase_orders.shipping_sku') ?? '';
   }
 
   /**

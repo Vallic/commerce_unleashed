@@ -46,6 +46,9 @@ commerce_unleashed.settings:
         supplier_code:
           type: string
           label: 'Default supplier code'
+        shipping_sku:
+          type: string
+          label: 'Default shipping SKU'
         complete:
           type: boolean
           label: 'Complete order'
