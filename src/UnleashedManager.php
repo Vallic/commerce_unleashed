@@ -200,7 +200,7 @@ class UnleashedManager implements UnleashedManagerInterface {
       $item_payload['LineTotal'] = $line_total->getNumber();
 
       $item_payload['LineTax'] = $tax_item_total->getNumber();
-      $item_payload['DiscountRate'] = $promotion_item_total->isZero() ? '0.00' : abs($promotion_item_total->divide($item->getTotalPrice()->getNumber())->getNumber());
+      $item_payload['DiscountRate'] = $promotion_item_total->isZero() ? '0.00' : abs((float) $promotion_item_total->divide($item->getTotalPrice()->getNumber())->getNumber());
 
       $payload['PurchaseOrderLines'][] = $item_payload;
     }
@@ -249,10 +249,10 @@ class UnleashedManager implements UnleashedManagerInterface {
       $payload['PurchaseOrderLines'][] = $item_payload;
     }
 
-    $payload['DiscountRate'] = $promotion_total->isZero() ? '0.00' : abs($promotion_total->divide($order->getTotalPrice()->getNumber()));
+    $payload['DiscountRate'] = $promotion_total->isZero() ? '0.00' : abs((float) $promotion_total->divide($order->getTotalPrice()->getNumber())->getNumber());
 
     $payload['TaxTotal'] = $tax_total->getNumber();
-    $payload['TaxRate'] = $tax_total->isZero() ? '0.00' : round(abs($tax_total->divide($order->getTotalPrice()->subtract($tax_total)->getNumber())->getNumber()), 2, PHP_ROUND_HALF_UP);
+    $payload['TaxRate'] = $tax_total->isZero() ? '0.00' : round(abs((float) $tax_total->divide($order->getTotalPrice()->subtract($tax_total)->getNumber())->getNumber()), 2, PHP_ROUND_HALF_UP);
     $payload['Subtotal'] = $subtotal->getNumber();
     $profiles = $order->collectProfiles();
     if (isset($profiles['shipping'])) {

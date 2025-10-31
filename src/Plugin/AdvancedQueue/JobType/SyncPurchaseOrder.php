@@ -61,7 +61,7 @@ class SyncPurchaseOrder extends JobTypeBase implements ContainerFactoryPluginInt
     if (isset($response['error'])) {
       return JobResult::failure($response['error']);
     }
-    return JobResult::success('Successfully synced ');
+    return JobResult::success(sprintf('Successfully synced. Unleashed GUID %s', $entity->uuid()));
   }
 
 }
