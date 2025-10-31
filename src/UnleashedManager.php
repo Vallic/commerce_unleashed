@@ -3,6 +3,7 @@
 namespace Drupal\commerce_unleashed;
 
 use Drupal\advancedqueue\Job;
+use Drupal\commerce_order\Entity\Order;
 use Drupal\commerce_order\Entity\OrderInterface;
 use Drupal\commerce_price\Price;
 use Drupal\commerce_product\Entity\Product;
@@ -136,18 +137,46 @@ class UnleashedManager implements UnleashedManagerInterface {
   /**
    * {@inheritdoc}
    */
-  public function syncOrder(OrderInterface $order): array {
+  public function syncPurchaseOrder(OrderInterface $order): array {
+    $payload = $this->getOrderPayload($order, self::UNLEASHED_PURCHASE_ORDERS);
+    $unleashed_order_event = new UnleashedOrderEvent($order, $payload);
+    $this->eventDispatcher->dispatch($order, UnleashedEvents::UNLEASHED_PURCHASE_ORDER);
+    $payload = $unleashed_order_event->getPayload();
+    return $this->unleashedClient->createPurchaseOrder($payload, $order->uuid());
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function syncSalesOrder(OrderInterface $order): array {
+    $payload = $this->getOrderPayload($order);
+    $unleashed_order_event = new UnleashedOrderEvent($order, $payload);
+    $this->eventDispatcher->dispatch($order, UnleashedEvents::UNLEASHED_PURCHASE_ORDER);
+    return $this->unleashedClient->createSalesOrder($unleashed_order_event->getPayload(), $order->uuid());
+  }
+
+  /**
+   * Generic payload build for both sales and purchase orders.
+   */
+  protected function getOrderPayload(OrderInterface $order, $type = self::UNLEASHED_SALES_ORDERS): array {
     $currency = $order->getTotalPrice()->getCurrencyCode();
     $payload = [
       'Guid' => $order->uuid(),
       'OrderNumber' => $order->getOrderNumber() ?? $order->id(),
       'OrderStatus' => 'Placed',
-      'Supplier' => [
-        'SupplierCode' => $this->getSupplierCode(),
-      ],
       'Total' => $order->getTotalPrice()->getNumber(),
       'OrderDate' => $this->dateFormatter->format($order->getCreatedTime(), 'custom', 'Y-m-d\\TH:i:s', 'UTC'),
+      // TBD: Add commerce_exchanger rate support.
+      'ExchangeRate' => 1,
     ];
+
+    if ($type === self::UNLEASHED_PURCHASE_ORDERS) {
+      $payload['Supplier']['SupplierCode'] = $this->getSupplierCode();
+    }
+    else {
+      $payload['Customer']['CustomerCode'] = $order->getEmail();
+      $payload['Warehouse']['WarehouseCode'] = $this->getWarehouseCode();
+    }
 
     $subtotal = $order->getSubtotalPrice();
 
@@ -158,7 +187,9 @@ class UnleashedManager implements UnleashedManagerInterface {
     $tax_total = new Price('0', $currency);
     $promotion_total = new Price('0', $currency);
 
-    $payload['PurchaseOrderLines'] = [];
+    $line_items_key = $type === 'sales' ? 'SalesOrderLines' : 'PurchaseOrderLines';
+
+    $payload[$line_items_key] = [];
     foreach ($order->getItems() as $item) {
       $item_payload = [
         'Guid' => $item->uuid(),
@@ -202,7 +233,7 @@ class UnleashedManager implements UnleashedManagerInterface {
       $item_payload['LineTax'] = $tax_item_total->getNumber();
       $item_payload['DiscountRate'] = $promotion_item_total->isZero() ? '0.00' : (string) abs((float) $promotion_item_total->divide($item->getTotalPrice()->getNumber())->getNumber());
 
-      $payload['PurchaseOrderLines'][] = $item_payload;
+      $payload[$line_items_key][] = $item_payload;
     }
 
     /** @var \Drupal\commerce_shipping\Entity\ShipmentInterface[] $shipments */
@@ -212,7 +243,7 @@ class UnleashedManager implements UnleashedManagerInterface {
       $item_payload = [
         'LineNumber' => time(),
         'Product' => [
-          'ProductCode' => $this->getShippingSku(),
+          'ProductCode' => $this->getShippingSku($order),
         ],
         'Currency' => [
           'CurrencyCode' => $currency,
@@ -246,7 +277,7 @@ class UnleashedManager implements UnleashedManagerInterface {
       // Unleashed handle shipping as a line item.
       $subtotal = $subtotal->add($unit_price);
 
-      $payload['PurchaseOrderLines'][] = $item_payload;
+      $payload[$line_items_key][] = $item_payload;
     }
 
     $payload['DiscountRate'] = $promotion_total->isZero() ? '0.00' : (string) abs((float) $promotion_total->divide($order->getTotalPrice()->getNumber())->getNumber());
@@ -254,6 +285,13 @@ class UnleashedManager implements UnleashedManagerInterface {
     $payload['TaxTotal'] = $tax_total->getNumber();
     $tax_rate = abs((float) $tax_total->divide($order->getTotalPrice()->subtract($tax_total)->getNumber())->getNumber());
     $payload['TaxRate'] = $tax_total->isZero() ? '0.00' : (string) round($tax_rate, 2, PHP_ROUND_HALF_UP);
+
+    if ($type === self::UNLEASHED_SALES_ORDERS) {
+      $payload['Tax'] = [
+        'TaxRate' => $payload['TaxRate'],
+      ];
+    }
+
     $payload['Subtotal'] = $subtotal->getNumber();
     $profiles = $order->collectProfiles();
     if (isset($profiles['shipping'])) {
@@ -270,10 +308,55 @@ class UnleashedManager implements UnleashedManagerInterface {
       $payload['DeliveryName'] = $address->getGivenName() . ' ' . $address->getFamilyName();
     }
 
-    $unleashed_order_event = new UnleashedOrderEvent($order, $payload);
-    $this->eventDispatcher->dispatch($order, UnleashedEvents::UNLEASHED_PURCHASE_ORDER);
-    $payload = $unleashed_order_event->getPayload();
-    return $this->unleashedClient->createPurchaseOrder($payload, $order->uuid());
+    return $payload;
+  }
+
+  public function getCustomerFromOrder(OrderInterface $order): array {
+    $customer = $this->getCustomerByMail($order->getEmail());
+
+    if (empty($customer)) {
+      $profiles = $order->collectProfiles();
+      $payload = [
+        'CustomerCode' => $order->getEmail(),
+        'CustomerName' => $order->getEmail(),
+        'Email' => $order->getEmail(),
+        'Currency' => [
+          'CurrencyCode' => $order->getTotalPrice()->getCurrencyCode(),
+        ],
+      ];
+
+      foreach ($profiles as $id => $profile) {
+        /** @var \Drupal\address\Plugin\Field\FieldType\AddressItem $address */
+        $address = $profile->get('address')->first();
+
+        $payload['Addresses'][] = [
+          'AddressType' => $id === 'shipping' ? 'Shipping' : 'Postal',
+          'AddressName' => $address->getGivenName() . ' ' . $address->getFamilyName(),
+          'StreetAddress' => $address->getAddressLine1(),
+          'StreetAddress2' => $address->getAddressLine2(),
+          'Region' => $address->getAdministrativeArea(),
+          'City' => $address->getLocality(),
+          'Country' => $address->getCountryCode(),
+          'PostalCode' => $address->getPostalCode(),
+        ];
+        $payload['CustomerName'] = $address->getGivenName() . ' ' . $address->getFamilyName();
+        $payload['ContactFirstName'] = $address->getGivenName();
+        $payload['ContactLastName'] = $address->getFamilyName();
+      }
+      $customer = $this->unleashedClient->createCustomer($payload);
+    }
+
+    return $customer;
+  }
+
+  public function getCustomerByMail(string $mail): array {
+    $response = $this->unleashedClient->getCustomers('customerCode=' . $mail);
+
+    if (empty($response['Items'])) {
+      return [];
+    }
+
+    return $response['Items'][0];
   }
 
   /**
@@ -387,14 +470,14 @@ class UnleashedManager implements UnleashedManagerInterface {
   /**
    * {@inheritdoc}
    */
-  public function syncOrders(): bool {
+  public function syncPurchaseOrders(): bool {
     return (bool) $this->unleashedSettings()->get('purchase_orders.sync');
   }
 
   /**
    * {@inheritdoc}
    */
-  public function syncOrderType(string $bundle): bool {
+  public function syncPurchaseOrderType(string $bundle): bool {
     $types = $this->unleashedSettings()->get('purchase_orders.types');
     return !empty($types[$bundle]);
   }
@@ -402,8 +485,29 @@ class UnleashedManager implements UnleashedManagerInterface {
   /**
    * {@inheritdoc}
    */
-  public function isOrderEligible(OrderInterface $order): bool {
-    return $this->syncOrders() && $this->syncOrderType($order->bundle());
+  public function syncSalesOrders(): bool {
+    return (bool) $this->unleashedSettings()->get('sales_orders.sync');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function syncSalesOrderType(string $bundle): bool {
+    $types = $this->unleashedSettings()->get('sales_orders.types');
+    return !empty($types[$bundle]);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isOrderEligible(OrderInterface $order): ?string {
+    if ($this->syncPurchaseOrders() && $this->syncPurchaseOrderType($order->bundle())) {
+      return self::UNLEASHED_PURCHASE_ORDERS;
+    }
+    if ($this->syncSalesOrders() && $this->syncSalesOrderType($order->bundle())) {
+      return self::UNLEASHED_SALES_ORDERS;
+    }
+    return NULL;
   }
 
   /**
@@ -416,15 +520,29 @@ class UnleashedManager implements UnleashedManagerInterface {
   /**
    * {@inheritdoc}
    */
-  public function getShippingSku(): string {
-    return $this->unleashedSettings()->get('purchase_orders.shipping_sku') ?? '';
+  public function getWarehouseCode(): string {
+    return $this->unleashedSettings()->get('sales_orders.warehouse_code') ?? '';
   }
 
   /**
    * {@inheritdoc}
    */
-  public function completeOrders(): bool {
-    return (bool) $this->unleashedSettings()->get('purchase_orders.complete');
+  public function getShippingSku(OrderInterface $order): string {
+    $type = $this->isOrderEligible($order);
+    return $this->unleashedSettings()->get(sprintf('%s_orders.shipping_sku', $type)) ?? '';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function completeOrders(OrderInterface $order): ?string {
+    if ($eligible = $this->isOrderEligible($order)) {
+      if ($this->unleashedSettings()->get(sprintf('%s_orders.complete', $eligible))) {
+        return $eligible;
+      }
+    }
+
+    return NULL;
   }
 
   /**
@@ -444,8 +562,12 @@ class UnleashedManager implements UnleashedManagerInterface {
   /**
    * {@inheritdoc}
    */
-  public function updateLocalStock(): bool {
-    return (bool) $this->unleashedSettings()->get('stock.local');
+  public function updateLocalStock(OrderInterface $order): bool {
+    if ($this->syncSalesOrderType($order->bundle())) {
+      return (bool) $this->unleashedSettings()->get('stock.local');
+    }
+
+    return FALSE;
   }
 
   /**

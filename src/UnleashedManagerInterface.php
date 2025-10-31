@@ -11,6 +11,10 @@ interface UnleashedManagerInterface {
 
   public const UNLEASHED_NON_MANAGED = -1;
 
+  public const UNLEASHED_SALES_ORDERS = 'sales';
+
+  public const UNLEASHED_PURCHASE_ORDERS = 'purchase';
+
   /**
    * Handle direct calls via client.
    */
@@ -34,7 +38,12 @@ interface UnleashedManagerInterface {
   /**
    * Sync order to Unleashed.
    */
-  public function syncOrder(OrderInterface $order): array;
+  public function syncPurchaseOrder(OrderInterface $order): array;
+
+  /**
+   * Sync order to Unleashed.
+   */
+  public function syncSalesOrder(OrderInterface $order): array;
 
   /**
    * Sync stock on hand.
@@ -99,17 +108,27 @@ interface UnleashedManagerInterface {
   /**
    * Is the order sync enabled.
    */
-  public function syncOrders(): bool;
+  public function syncPurchaseOrders(): bool;
 
   /**
-   * Is the order type eligible for sync.
+   * Is the order type eligible for purchase order sync.
    */
-  public function syncOrderType(string $bundle): bool;
+  public function syncPurchaseOrderType(string $bundle): bool;
 
   /**
-   * Is order eligible for sync.
+   * Is the order sync enabled for sales orders.
    */
-  public function isOrderEligible(OrderInterface $order): bool;
+  public function syncSalesOrders(): bool;
+
+  /**
+   * Is the order type eligible for sync with Unleashed.
+   */
+  public function syncSalesOrderType(string $bundle): bool;
+
+  /**
+   * Is order eligible for sync with Unleashed.
+   */
+  public function isOrderEligible(OrderInterface $order): ?string;
 
   /**
    * Get default supplier code.
@@ -117,12 +136,17 @@ interface UnleashedManagerInterface {
   public function getSupplierCode(): string;
 
   /**
-   * Do order upon fulfillment needs to sent to Unleashed.
+   * Do order upon fulfillment need to be send to Unleashed?
    */
-  public function completeOrders(): bool;
+  public function completeOrders(OrderInterface $order): ?string;
 
   /**
-   * Is the stock sync enabled.
+   * Get the default shipping SKU.
+   */
+  public function getShippingSku(OrderInterface $order): ?string;
+
+  /**
+   * Is the stock sync enabled?
    */
   public function syncStock(): bool;
 
@@ -134,6 +158,6 @@ interface UnleashedManagerInterface {
   /**
    * Determine do we update local stock table post order placement.
    */
-  public function updateLocalStock(): bool;
+  public function updateLocalStock(OrderInterface $order): bool;
 
 }

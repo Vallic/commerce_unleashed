@@ -52,6 +52,26 @@ commerce_unleashed.settings:
         complete:
           type: boolean
           label: 'Complete order'
+    sales_orders:
+      type: mapping
+      mapping:
+        sync:
+          type: boolean
+          label: 'Sync orders'
+        types:
+          type: sequence
+          label: Order types
+          mapping:
+            type: string
+        warehouse_code:
+          type: string
+          label: 'Default warehouse code'
+        shipping_sku:
+          type: string
+          label: 'Default shipping SKU'
+        complete:
+          type: boolean
+          label: 'Complete order'
     stock:
       type: mapping
       mapping:

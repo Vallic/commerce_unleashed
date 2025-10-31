@@ -14,6 +14,12 @@ purchase_orders:
   shipping_sku: ''
   types:
     default: 0
+sales_orders:
+  sync: false
+  warehouse_code: ''
+  shipping_sku: ''
+  types:
+    default: 0
 stock:
   sync: false
   availability: false

@@ -184,7 +184,11 @@ class SettingsForm extends ConfigFormBase {
       '#description' => $this->t('Select order types for synchronization.'),
       '#options' => $order_types_ids,
       '#default_value' => $config->get('purchase_orders.types') ?? FALSE,
-      '#required' => TRUE,
+      '#states' => [
+        'required' => [
+          ':input[name="purchase_orders[sync]"]' => ['value' => 1],
+        ],
+      ],
     ];
 
     $form['purchase_orders']['supplier_code'] = [
@@ -192,7 +196,11 @@ class SettingsForm extends ConfigFormBase {
       '#title' => $this->t('Supplier code'),
       '#description' => $this->t('Default supplier code, required for purchase orders. You can alter it via event subscriber programmatically for any order. @see \Drupal\commerce_unleashed\Events\UnleashedEvents::UNLEASHED_PURCHASE_ORDER'),
       '#default_value' => $config->get('purchase_orders.supplier_code') ?? '',
-      '#required' => TRUE,
+      '#states' => [
+        'required' => [
+          ':input[name="purchase_orders[sync]"]' => ['value' => 1],
+        ],
+      ],
     ];
 
     $form['purchase_orders']['shipping_sku'] = [
@@ -200,7 +208,11 @@ class SettingsForm extends ConfigFormBase {
       '#title' => $this->t('Shipping SKU'),
       '#description' => $this->t('SKU of the product from Unleashed that will be used for shipping.'),
       '#default_value' => $config->get('purchase_orders.shipping_sku') ?? '',
-      '#required' => TRUE,
+      '#states' => [
+        'required' => [
+          ':input[name="purchase_orders[sync]"]' => ['value' => 1],
+        ],
+      ],
     ];
 
     $form['purchase_orders']['complete'] = [
@@ -208,6 +220,90 @@ class SettingsForm extends ConfigFormBase {
       '#title' => $this->t('Complete orders from Drupal'),
       '#description' => $this->t('Once the order is completed in Drupal, send an complete call to Unleashed'),
       '#default_value' => $config->get('purchase_orders.complete') ?? FALSE,
+      '#required' => FALSE,
+    ];
+
+    $form['sales_orders'] = [
+      '#type' => 'details',
+      '#title' => 'Sales orders',
+      '#tree' => TRUE,
+      '#open' => TRUE,
+    ];
+
+    $form['sales_orders']['sync'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Sync Drupal orders'),
+      '#description' => $this->t('Synchronize Drupal orders as purchase orders.'),
+      '#default_value' => $config->get('sales_orders.sync') ?? FALSE,
+      '#required' => FALSE,
+    ];
+
+    $form['sales_orders']['types'] = [
+      '#type' => 'checkboxes',
+      '#title' => $this->t('Order types'),
+      '#description' => $this->t('Select order types for synchronization.'),
+      '#options' => $order_types_ids,
+      '#default_value' => $config->get('sales_orders.types') ?? FALSE,
+      '#states' => [
+        'required' => [
+          ':input[name="sales_orders[sync]"]' => ['value' => 1],
+        ],
+      ],
+    ];
+
+    $form['sales_orders']['warehouse_code'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Warehouse code'),
+      '#description' => $this->t('Default warehouse code, required for sales orders. You can alter it via event subscriber programmatically for any order. @see \Drupal\commerce_unleashed\Events\UnleashedEvents::UNLEASHED_PURCHASE_ORDER'),
+      '#default_value' => $config->get('sales_orders.warehouse_code') ?? '',
+      '#states' => [
+        'required' => [
+          ':input[name="sales_orders[sync]"]' => ['value' => 1],
+        ],
+      ],
+    ];
+
+    $form['sales_orders']['tax_name'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Tax name'),
+      '#description' => $this->t('Default tax name, required for sales orders. You can alter it via event subscriber programmatically for any order. @see \Drupal\commerce_unleashed\Events\UnleashedEvents::UNLEASHED_PURCHASE_ORDER'),
+      '#default_value' => $config->get('sales_orders.tax_name') ?? '',
+      '#states' => [
+        'required' => [
+          ':input[name="sales_orders[sync]"]' => ['value' => 1],
+        ],
+      ],
+    ];
+
+    $form['sales_orders']['tax_code'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Tax code'),
+      '#description' => $this->t('Default tax code, required for sales orders. You can alter it via event subscriber programmatically for any order. @see \Drupal\commerce_unleashed\Events\UnleashedEvents::UNLEASHED_PURCHASE_ORDER'),
+      '#default_value' => $config->get('sales_orders.tax_code') ?? '',
+      '#states' => [
+        'required' => [
+          ':input[name="sales_orders[sync]"]' => ['value' => 1],
+        ],
+      ],
+    ];
+
+    $form['sales_orders']['shipping_sku'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Shipping SKU'),
+      '#description' => $this->t('SKU of the product from Unleashed that will be used for shipping.'),
+      '#default_value' => $config->get('sales_orders.shipping_sku') ?? '',
+      '#states' => [
+        'required' => [
+          ':input[name="sales_orders[sync]"]' => ['value' => 1],
+        ],
+      ],
+    ];
+
+    $form['sales_orders']['complete'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Complete orders from Drupal'),
+      '#description' => $this->t('Once the order is completed in Drupal, send an complete call to Unleashed'),
+      '#default_value' => $config->get('sales_orders.complete') ?? FALSE,
       '#required' => FALSE,
     ];
 
@@ -255,6 +351,7 @@ class SettingsForm extends ConfigFormBase {
       ->set('logging', $form_state->getValue('logging'))
       ->set('products', $form_state->getValue('products'))
       ->set('purchase_orders', $form_state->getValue('purchase_orders'))
+      ->set('sales_orders', $form_state->getValue('sales_orders'))
       ->set('stock', $form_state->getValue('stock'))
       ->save();
     parent::submitForm($form, $form_state);

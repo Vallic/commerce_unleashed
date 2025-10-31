@@ -58,6 +58,15 @@ class UnleashedClient {
       if (isset($data['Description'])) {
         return ['error' => $data['Description']];
       }
+
+      if (isset($data['Items'])) {
+        $error = [];
+        foreach ($data['Items'] as $item) {
+          $error[] = $item['Description'];
+        }
+
+        return ['error' => implode(' | ', $error)];
+      }
       throw new BadRequestHttpException($exception->getMessage());
     }
 
@@ -177,6 +186,60 @@ class UnleashedClient {
   }
 
   /**
+   * Returns purchase sales, paginated.
+   *
+   * @see https://apidocs.unleashedsoftware.com/SalesOrders
+   */
+  public function getSalesOrders($query = ''): array {
+    return $this->request('GET', 'SalesOrders', [], $query);
+  }
+
+  /**
+   * Get purchase sales by guid.
+   *
+   * @see https://apidocs.unleashedsoftware.com/SalesOrders
+   */
+  public function getSalesOrder($guid): array {
+    return $this->request('GET', 'SalesOrders/' . $guid);
+  }
+
+  /**
+   * Create sales order with or without guid.
+   *
+   * @see https://apidocs.unleashedsoftware.com/SalesOrders
+   */
+  public function createSalesOrder($payload, ?string $guid): array {
+    return $this->request('POST', $guid ? 'SalesOrders/' . $guid : 'SalesOrders', $payload);
+  }
+
+  /**
+   * Update sales order.
+   *
+   * @see https://apidocs.unleashedsoftware.com/SalesOrders
+   */
+  public function updateSalesOrder($payload, $guid): void {
+    $this->request('PUT', 'SalesOrders/' . $guid, $payload);
+  }
+
+  /**
+   * Complete sales order.
+   *
+   * @see https://apidocs.unleashedsoftware.com/SalesOrders
+   */
+  public function completeSalesOrder($guid): void {
+    $this->request('POST', 'SalesOrders/' . $guid . '/Complete');
+  }
+
+  /**
+   * Complete sales order.
+   *
+   * @see https://apidocs.unleashedsoftware.com/SalesOrders
+   */
+  public function deleteSalesOrder($guid): void {
+    $this->request('DELETE', 'SalesOrders/' . $guid);
+  }
+
+  /**
    * Returns customers, paginated.
    *
    * @see https://apidocs.unleashedsoftware.com/Customers
@@ -209,7 +272,34 @@ class UnleashedClient {
    * @see https://apidocs.unleashedsoftware.com/Customers
    */
   public function updateCustomer($guid, $payload): void {
-    $this->request('PUT', 'Customers/{$guid}', $payload);
+    $this->request('PUT', 'Customers/' . $guid, $payload);
+  }
+
+  /**
+   * Get suppliers.
+   *
+   * @see https://apidocs.unleashedsoftware.com/Suppliers
+   */
+  public function getSuppliers(): array {
+    return $this->request('GET', 'Suppliers');
+  }
+
+  /**
+   * Get warehouses.
+   *
+   * @see https://apidocs.unleashedsoftware.com/Warehouses
+   */
+  public function getWarehouses(): array {
+    return $this->request('GET', 'Warehouses');
+  }
+
+  /**
+   * Get taxes.
+   *
+   * @see https://apidocs.unleashedsoftware.com/Taxes
+   */
+  public function getTaxes(): array {
+    return $this->request('GET', 'Taxes');
   }
 
   /**

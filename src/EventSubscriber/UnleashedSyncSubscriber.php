@@ -31,17 +31,17 @@ class UnleashedSyncSubscriber implements EventSubscriberInterface {
    */
   public function onOrderPlace(WorkflowTransitionEvent $event): void {
     $order = $event->getEntity();
-    if ($this->unleashedManager->isOrderEligible($order)) {
+    if ($sync_type = $this->unleashedManager->isOrderEligible($order)) {
       $queue_storage = $this->entityTypeManager->getStorage('advancedqueue_queue');
       /** @var \Drupal\advancedqueue\Entity\QueueInterface $queue */
       $queue = $queue_storage->load('commerce_unleashed');
       // Create a job and queue each one up.
-      $sync = Job::create('commerce_unleashed_purchase_order', [
+      $sync = Job::create(sprintf('commerce_unleashed_%s_order', $sync_type), [
         'order_id' => $order->id(),
       ]);
       $queue->enqueueJob($sync);
 
-      if ($this->unleashedManager->updateLocalStock()) {
+      if ($this->unleashedManager->updateLocalStock($order)) {
         foreach ($order->getItems() as $item) {
           $this->unleashedManager->updateLocalStockOnHand($item->getPurchasedEntity(), (int) $item->getQuantity());
         }
@@ -54,9 +54,14 @@ class UnleashedSyncSubscriber implements EventSubscriberInterface {
    */
   public function onOrderFulfill(WorkflowTransitionEvent $event): void {
     $order = $event->getEntity();
-    if ($this->unleashedManager->isOrderEligible($order) && $this->unleashedManager->completeOrders()) {
+    if ($type = $this->unleashedManager->completeOrders($order)) {
       try {
-        $this->unleashedManager->getClient()->completePurchaseOrder($order->uuid());
+        if ($type === UnleashedManagerInterface::UNLEASHED_SALES_ORDERS) {
+          $this->unleashedManager->getClient()->completeSalesOrder($order->uuid());
+        }
+        else {
+          $this->unleashedManager->getClient()->completePurchaseOrder($order->uuid());
+        }
       }
       catch (\Exception $e) {
         $this->getLogger('commerce_unleashed')->error($e->getMessage());
@@ -69,9 +74,14 @@ class UnleashedSyncSubscriber implements EventSubscriberInterface {
    */
   public function onOrderCancel(WorkflowTransitionEvent $event): void {
     $order = $event->getEntity();
-    if ($this->unleashedManager->isOrderEligible($order)) {
+    if ($type = $this->unleashedManager->isOrderEligible($order)) {
       try {
-        $this->unleashedManager->getClient()->deletePurchaseOrder($order->uuid());
+        if ($type === UnleashedManagerInterface::UNLEASHED_SALES_ORDERS) {
+          $this->unleashedManager->getClient()->deleteSalesOrder($order->uuid());
+        }
+        else {
+          $this->unleashedManager->getClient()->deletePurchaseOrder($order->uuid());
+        }
       }
       catch (\Exception $e) {
         $this->getLogger('commerce_unleashed')->error($e->getMessage());

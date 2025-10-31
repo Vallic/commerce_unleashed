@@ -9,13 +9,13 @@ use Drupal\advancedqueue\JobResult;
  * Provides the job type for syncing orders with Unleashed.
  *
  * @AdvancedQueueJobType(
- *   id = "commerce_unleashed_purchase_order",
- *   label = @Translation("Unleashed sync purchase orders"),
+ *   id = "commerce_unleashed_sales_order",
+ *   label = @Translation("Unleashed sync sales orders"),
  * )
  *
  * @phpstan-consistent-constructor
  */
-class SyncPurchaseOrder extends AbstractOrderSync {
+class SyncSalesOrder extends AbstractOrderSync {
 
   /**
    * {@inheritdoc}
@@ -29,7 +29,12 @@ class SyncPurchaseOrder extends AbstractOrderSync {
       return JobResult::failure(sprintf('Order with id "%s" not found.', $entity_id));
     }
 
-    $response = $this->unleashedManager->syncPurchaseOrder($entity);
+    $customer = $this->unleashedManager->getCustomerFromOrder($entity);
+    if (isset($customer['error'])) {
+      return JobResult::failure($customer['error']);
+    }
+
+    $response = $this->unleashedManager->syncSalesOrder($entity);
     if (isset($response['error'])) {
       return JobResult::failure($response['error']);
     }
