@@ -263,30 +263,6 @@ class SettingsForm extends ConfigFormBase {
       ],
     ];
 
-    $form['sales_orders']['tax_name'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('Tax name'),
-      '#description' => $this->t('Default tax name, required for sales orders. You can alter it via event subscriber programmatically for any order. @see \Drupal\commerce_unleashed\Events\UnleashedEvents::UNLEASHED_PURCHASE_ORDER'),
-      '#default_value' => $config->get('sales_orders.tax_name') ?? '',
-      '#states' => [
-        'required' => [
-          ':input[name="sales_orders[sync]"]' => ['value' => 1],
-        ],
-      ],
-    ];
-
-    $form['sales_orders']['tax_code'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('Tax code'),
-      '#description' => $this->t('Default tax code, required for sales orders. You can alter it via event subscriber programmatically for any order. @see \Drupal\commerce_unleashed\Events\UnleashedEvents::UNLEASHED_PURCHASE_ORDER'),
-      '#default_value' => $config->get('sales_orders.tax_code') ?? '',
-      '#states' => [
-        'required' => [
-          ':input[name="sales_orders[sync]"]' => ['value' => 1],
-        ],
-      ],
-    ];
-
     $form['sales_orders']['shipping_sku'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Shipping SKU'),

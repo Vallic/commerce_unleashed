@@ -3,7 +3,6 @@
 namespace Drupal\commerce_unleashed;
 
 use Drupal\advancedqueue\Job;
-use Drupal\commerce_order\Entity\Order;
 use Drupal\commerce_order\Entity\OrderInterface;
 use Drupal\commerce_price\Price;
 use Drupal\commerce_product\Entity\Product;
@@ -311,6 +310,9 @@ class UnleashedManager implements UnleashedManagerInterface {
     return $payload;
   }
 
+  /**
+   * Resolve Unleashed customer by Drupal order.
+   */
   public function getCustomerFromOrder(OrderInterface $order): array {
     $customer = $this->getCustomerByMail($order->getEmail());
 
@@ -349,6 +351,9 @@ class UnleashedManager implements UnleashedManagerInterface {
     return $customer;
   }
 
+  /**
+   * Get customer by mail.
+   */
   public function getCustomerByMail(string $mail): array {
     $response = $this->unleashedClient->getCustomers('customerCode=' . $mail);
 
