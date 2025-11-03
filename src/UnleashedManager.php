@@ -214,7 +214,7 @@ class UnleashedManager implements UnleashedManagerInterface {
           $tax_total = $tax_total->add($adjustment->getAmount());
           $item_payload['TaxRate'] = $adjustment->getPercentage();
           if ($adjustment->isIncluded()) {
-            $unit_price = $unit_price->subtract($adjustment->getAmount());
+            $unit_price = $unit_price->subtract($adjustment->getAmount()->divide($item->getQuantity()));
             $line_total = $line_total->subtract($adjustment->getAmount());
             $subtotal = $subtotal->subtract($adjustment->getAmount());
           }
@@ -223,14 +223,23 @@ class UnleashedManager implements UnleashedManagerInterface {
         if ($adjustment->getType() === 'promotion') {
           $promotion_item_total = $promotion_item_total->add($adjustment->getAmount());
           $promotion_total = $promotion_total->add($adjustment->getAmount());
+          if ($adjustment->isIncluded()) {
+            $unit_price = $unit_price->add($adjustment->getAmount()->divide($item->getQuantity()));
+            $line_total = $line_total->add($adjustment->getAmount());
+            $subtotal = $subtotal->add($adjustment->getAmount());
+          }
         }
       }
 
       $item_payload['UnitPrice'] = $unit_price->getNumber();
-      $item_payload['LineTotal'] = $line_total->getNumber();
+      $item_payload['LineTotal'] = $line_total->add($promotion_item_total)->getNumber();
 
       $item_payload['LineTax'] = $tax_item_total->getNumber();
-      $item_payload['DiscountRate'] = $promotion_item_total->isZero() ? '0.00' : (string) abs((float) $promotion_item_total->divide($item->getTotalPrice()->getNumber())->getNumber());
+      $item_payload['DiscountRate'] = $promotion_item_total->isZero() ? '0.00' : (string) abs((float) $promotion_item_total->divide($line_total->getNumber())->getNumber());
+
+      if (!$promotion_item_total->isZero()) {
+        $item_payload['DiscountedUnitPrice'] = round($unit_price->multiply(1 - $item_payload['DiscountRate'])->getNumber(), 4, PHP_ROUND_HALF_UP);
+      }
 
       $payload[$line_items_key][] = $item_payload;
     }
@@ -253,7 +262,6 @@ class UnleashedManager implements UnleashedManagerInterface {
 
       $unit_price = $shipment->getAmount();
       $line_total = $shipment->getAmount();
-
       foreach ($shipment->getAdjustments() as $adjustment) {
         if ($adjustment->getType() === 'tax') {
           $tax_total = $tax_total->add($adjustment->getAmount());
@@ -279,8 +287,6 @@ class UnleashedManager implements UnleashedManagerInterface {
       $payload[$line_items_key][] = $item_payload;
     }
 
-    $payload['DiscountRate'] = $promotion_total->isZero() ? '0.00' : (string) abs((float) $promotion_total->divide($order->getTotalPrice()->getNumber())->getNumber());
-
     $payload['TaxTotal'] = $tax_total->getNumber();
     $tax_rate = abs((float) $tax_total->divide($order->getTotalPrice()->subtract($tax_total)->getNumber())->getNumber());
     $payload['TaxRate'] = $tax_total->isZero() ? '0.00' : (string) round($tax_rate, 2, PHP_ROUND_HALF_UP);
@@ -291,7 +297,7 @@ class UnleashedManager implements UnleashedManagerInterface {
       ];
     }
 
-    $payload['Subtotal'] = $subtotal->getNumber();
+    $payload['Subtotal'] = $subtotal->add($promotion_total)->getNumber();
     $profiles = $order->collectProfiles();
     if (isset($profiles['shipping'])) {
       $shipping = $profiles['shipping'];
