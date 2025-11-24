@@ -87,7 +87,6 @@ class UnleashedManager implements UnleashedManagerInterface {
     /** @var \Drupal\commerce_product\ProductVariationStorageInterface $product_variation_storage */
     $product_variation_storage = $this->entityTypeManager->getStorage('commerce_product_variation');
 
-    $save = TRUE;
     $product_variation = $product_variation_storage->loadBySku($payload['ProductCode']);
     $price = new Price((string) $payload['DefaultSellPrice'], $this->getCurrencyCode());
     if (!$product_variation) {
@@ -104,9 +103,6 @@ class UnleashedManager implements UnleashedManagerInterface {
       if (!empty($compare)) {
         $product_variation->setPrice($price);
       }
-      else {
-        $save = FALSE;
-      }
     }
 
     if ($this->syncFullProduct()) {
@@ -116,9 +112,7 @@ class UnleashedManager implements UnleashedManagerInterface {
     $unleashed_product_event = new UnleashedProductVariationEvent($product_variation, $payload);
     $this->eventDispatcher->dispatch($unleashed_product_event, UnleashedEvents::UNLEASHED_PRODUCT_VARIATION);
     $product_variation = $unleashed_product_event->getProductVariation();
-    if ($save) {
-      $product_variation->save();
-    }
+    $product_variation->save();
 
     if (!$product_variation->getProduct()) {
       $product = Product::create([
