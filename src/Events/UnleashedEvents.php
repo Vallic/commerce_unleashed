@@ -26,12 +26,21 @@ final class UnleashedEvents {
   const UNLEASHED_PRODUCT_VARIATION = 'commerce_unleashed.event.product_variation';
 
   /**
+   * Name of the event fired when sending product variation to Unleashed.
+   *
+   * @Event
+   *
+   * @see \Drupal\commerce_unleashed\Events\UnleashedProductEvent
+   */
+  const UNLEASHED_PRODUCT = 'commerce_unleashed.event.product';
+
+  /**
    * Name of the event fired when sending order to Unleashed.
    *
    * @Event
    *
    * @see \Drupal\commerce_unleashed\Events\UnleashedOrderEvent
    */
-  const UNLEASHED_PURCHASE_ORDER = 'commerce_unleashed.event.order';
+  const UNLEASHED_ORDER = 'commerce_unleashed.event.order';
 
 }

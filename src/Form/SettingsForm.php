@@ -135,7 +135,7 @@ class SettingsForm extends ConfigFormBase {
     $form['products']['store'] = [
       '#type' => 'radios',
       '#title' => $this->t('Default store'),
-      '#description' => $this->t('Select default store type for synchronization.'),
+      '#description' => $this->t('Select default store for synchronization.'),
       '#options' => $store_ids,
       '#default_value' => $config->get('products.store'),
       '#required' => TRUE,

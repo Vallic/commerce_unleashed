@@ -12,7 +12,7 @@ use Drupal\commerce_product\Entity\ProductVariationInterface;
  */
 class UnleashedProductVariationEvent extends EventBase {
 
-  public function __construct(protected ProductVariationInterface $productVariation, protected array $payload) {}
+  public function __construct(protected ProductVariationInterface $productVariation, protected array $payload, protected bool $saveProductVariation = FALSE) {}
 
   /**
    * Gets the product variation.
@@ -26,6 +26,7 @@ class UnleashedProductVariationEvent extends EventBase {
    */
   public function setProductVariation(ProductVariationInterface $product_variation): UnleashedProductVariationEvent {
     $this->productVariation = $product_variation;
+    $this->saveProductVariation = TRUE;
     return $this;
   }
 
@@ -34,6 +35,15 @@ class UnleashedProductVariationEvent extends EventBase {
    */
   public function getPayload(): array {
     return $this->payload;
+  }
+
+  /**
+   * Marks if the product variation should be saved.
+   *
+   * Based of setProductVariation method.
+   */
+  public function saveProductVariation(): bool {
+    return $this->saveProductVariation;
   }
 
 }

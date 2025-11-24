@@ -9,6 +9,7 @@ use Drupal\commerce_product\Entity\Product;
 use Drupal\commerce_product\Entity\ProductVariationInterface;
 use Drupal\commerce_unleashed\Events\UnleashedEvents;
 use Drupal\commerce_unleashed\Events\UnleashedOrderEvent;
+use Drupal\commerce_unleashed\Events\UnleashedProductEvent;
 use Drupal\commerce_unleashed\Events\UnleashedProductVariationEvent;
 use Drupal\commerce_unleashed\Events\UnleashedSyncEvent;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -89,6 +90,8 @@ class UnleashedManager implements UnleashedManagerInterface {
 
     $product_variation = $product_variation_storage->loadBySku($payload['ProductCode']);
     $price = new Price((string) $payload['DefaultSellPrice'], $this->getCurrencyCode());
+
+    $save_product_variation = TRUE;
     if (!$product_variation) {
       $product_variation = $product_variation_storage->create([
         'type' => $this->getVariationType(),
@@ -102,19 +105,28 @@ class UnleashedManager implements UnleashedManagerInterface {
       $compare = $product_variation->getPrice()?->compareTo($price);
       if (!empty($compare)) {
         $product_variation->setPrice($price);
+        $save_product_variation = FALSE;
       }
     }
 
     if ($this->syncFullProduct()) {
-      $payload = $this->unleashedClient->getProduct($payload['Guid']);
+      $response = $this->unleashedClient->getProduct($payload['Guid']);
+      if (isset($response['Items'][0])) {
+        $payload = $response['Items'][0];
+      }
     }
 
-    $unleashed_product_event = new UnleashedProductVariationEvent($product_variation, $payload);
-    $this->eventDispatcher->dispatch($unleashed_product_event, UnleashedEvents::UNLEASHED_PRODUCT_VARIATION);
-    $product_variation = $unleashed_product_event->getProductVariation();
-    $product_variation->save();
+    $unleashed_product__variation_event = new UnleashedProductVariationEvent($product_variation, $payload, $save_product_variation);
+    $this->eventDispatcher->dispatch($unleashed_product__variation_event, UnleashedEvents::UNLEASHED_PRODUCT_VARIATION);
+    $product_variation = $unleashed_product__variation_event->getProductVariation();
 
-    if (!$product_variation->getProduct()) {
+    if ($unleashed_product__variation_event->saveProductVariation()) {
+      $product_variation->save();
+    }
+
+    $product = $product_variation->getProduct();
+    $save_product = FALSE;
+    if (!$product) {
       $product = Product::create([
         'type' => $this->getVariationType(),
         'title' => $payload['ProductDescription'],
@@ -123,8 +135,17 @@ class UnleashedManager implements UnleashedManagerInterface {
         // Keep them unpublished.
         'status' => 0,
       ]);
+      $save_product = TRUE;
+    }
+
+    $unleashed_product_event = new UnleashedProductEvent($product, $payload, $save_product);
+    $this->eventDispatcher->dispatch($unleashed_product_event, UnleashedEvents::UNLEASHED_PRODUCT);
+    $product = $unleashed_product_event->getProduct();
+
+    if ($unleashed_product_event->saveProduct()) {
       $product->save();
     }
+
   }
 
   /**
@@ -132,8 +153,8 @@ class UnleashedManager implements UnleashedManagerInterface {
    */
   public function syncPurchaseOrder(OrderInterface $order): array {
     $payload = $this->getOrderPayload($order, self::UNLEASHED_PURCHASE_ORDERS);
-    $unleashed_order_event = new UnleashedOrderEvent($order, $payload);
-    $this->eventDispatcher->dispatch($order, UnleashedEvents::UNLEASHED_PURCHASE_ORDER);
+    $unleashed_order_event = new UnleashedOrderEvent($order, $payload, self::UNLEASHED_PURCHASE_ORDERS);
+    $this->eventDispatcher->dispatch($order, UnleashedEvents::UNLEASHED_ORDER);
     $payload = $unleashed_order_event->getPayload();
     return $this->unleashedClient->createPurchaseOrder($payload, $order->uuid());
   }
@@ -144,7 +165,7 @@ class UnleashedManager implements UnleashedManagerInterface {
   public function syncSalesOrder(OrderInterface $order): array {
     $payload = $this->getOrderPayload($order);
     $unleashed_order_event = new UnleashedOrderEvent($order, $payload);
-    $this->eventDispatcher->dispatch($order, UnleashedEvents::UNLEASHED_PURCHASE_ORDER);
+    $this->eventDispatcher->dispatch($order, UnleashedEvents::UNLEASHED_ORDER);
     return $this->unleashedClient->createSalesOrder($unleashed_order_event->getPayload(), $order->uuid());
   }
 
