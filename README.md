@@ -63,20 +63,6 @@ Configure api key and id.
 ## Stock overview
 Go to `Commerce => Stock on hand`
 
-## Custom configuration / modifications.
-You can enrich order payload for purchase orders with this event
-`\Drupal\commerce_unleashed\Events\UnleashedOrderEvent`.
-
-You can alter how product variations are created / synced from Unleashed with this event
-`\Drupal\commerce_unleashed\Events\UnleashedProductVariationEvent`
-
-You can skip syncing specific Unleashed products with this event
-`\Drupal\commerce_unleashed\Events\UnleashedSyncEvent`
-
-The http client for communication with Unleashed has all available methods
-for interacting with API. If you want to use it in your custom code,
-you can easily initiate it like this:
-
 ## Syncing products
 You can sync products from Unleashed using Drupal cron or drush command.
 Cron is limited with no additional filtering options.
@@ -91,6 +77,20 @@ It would sync all products from a Tobacco product group with the brief=true para
 Note that you need to use `//` instead of `&` for multiple query parameters,
 to avoid issues with executing drush. The drush command transforms it to `&`
 for the API call.
+
+## Custom configuration / modifications.
+You can enrich order payload for purchase orders with this event
+`\Drupal\commerce_unleashed\Events\UnleashedOrderEvent`.
+
+You can alter how product variations are created / synced from Unleashed with this event
+`\Drupal\commerce_unleashed\Events\UnleashedProductVariationEvent`
+
+You can skip syncing specific Unleashed products with this event
+`\Drupal\commerce_unleashed\Events\UnleashedSyncEvent`
+
+The http client for communication with Unleashed has all available methods
+for interacting with API. If you want to use it in your custom code,
+you can easily initiate it like this:
 
 ```php
 $client = new \Drupal\commerce_unleashed\UnleashedClient('api_id', 'api_key');
