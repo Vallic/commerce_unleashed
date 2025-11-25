@@ -77,6 +77,21 @@ The http client for communication with Unleashed has all available methods
 for interacting with API. If you want to use it in your custom code,
 you can easily initiate it like this:
 
+## Syncing products
+You can sync products from Unleashed using Drupal cron or drush command.
+Cron is limited with no additional filtering options.
+
+With drush command you can use all filters available in Unleashed API.
+@see https://apidocs.unleashedsoftware.com/Products
+
+Example:
+`drush commerce_unleashed:sync:products --query=productGroup=Tobacco//brief=true`
+It would sync all products from a Tobacco product group with the brief=true parameter.
+
+Note that you need to use `//` instead of `&` for multiple query parameters,
+to avoid issues with executing drush. The drush command transforms it to `&`
+for the API call.
+
 ```php
 $client = new \Drupal\commerce_unleashed\UnleashedClient('api_id', 'api_key');
 $client->getProduct('xxxx-xxxx-xxxx-xxxx');

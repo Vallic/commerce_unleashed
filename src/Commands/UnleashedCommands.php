@@ -40,7 +40,8 @@ class UnleashedCommands extends DrushCommands {
    */
   public function syncProducts(string $sku = 'all', array $options = ['query' => NULL]): void {
     if ($sku === 'all') {
-      $query = $options['query'] ?? 'brief=true';
+      // Use // to escape the &.
+      $query = $options['query'] ? str_replace('//', '&', $options['query']) : 'brief=true';
       $this->unleashedManager->syncProducts($query);
     }
     else {
