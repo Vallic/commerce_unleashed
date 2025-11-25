@@ -1,6 +1,6 @@
 services:
   commerce_unleashed.commands:
     class: \Drupal\commerce_unleashed\Commands\UnleashedCommands
-    arguments: ['@entity_type.manager', '@commerce_unleashed.manager']
+    arguments: ['@entity_type.manager', '@commerce_unleashed.manager', '@keyvalue']
     tags:
       - { name: drush.command }
