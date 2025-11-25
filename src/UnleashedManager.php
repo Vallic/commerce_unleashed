@@ -151,9 +151,8 @@ class UnleashedManager implements UnleashedManagerInterface {
   public function syncPurchaseOrder(OrderInterface $order): array {
     $payload = $this->getOrderPayload($order, self::UNLEASHED_PURCHASE_ORDERS);
     $unleashed_order_event = new UnleashedOrderEvent($order, $payload, self::UNLEASHED_PURCHASE_ORDERS);
-    $this->eventDispatcher->dispatch($order, UnleashedEvents::UNLEASHED_ORDER);
-    $payload = $unleashed_order_event->getPayload();
-    return $this->unleashedClient->createPurchaseOrder($payload, $order->uuid());
+    $this->eventDispatcher->dispatch($unleashed_order_event, UnleashedEvents::UNLEASHED_ORDER);
+    return $this->unleashedClient->createPurchaseOrder($unleashed_order_event->getPayload(), $order->uuid());
   }
 
   /**
@@ -162,7 +161,7 @@ class UnleashedManager implements UnleashedManagerInterface {
   public function syncSalesOrder(OrderInterface $order): array {
     $payload = $this->getOrderPayload($order);
     $unleashed_order_event = new UnleashedOrderEvent($order, $payload);
-    $this->eventDispatcher->dispatch($order, UnleashedEvents::UNLEASHED_ORDER);
+    $this->eventDispatcher->dispatch($unleashed_order_event, UnleashedEvents::UNLEASHED_ORDER);
     return $this->unleashedClient->createSalesOrder($unleashed_order_event->getPayload(), $order->uuid());
   }
 
