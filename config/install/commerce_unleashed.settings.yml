@@ -10,14 +10,14 @@ products:
   currency_code: ''
 purchase_orders:
   sync: false
-  supplier_code: ''
-  shipping_sku: ''
+  supplier_code: 'N/A'
+  shipping_sku: 'N/A'
   types:
     default: 0
 sales_orders:
   sync: false
-  warehouse_code: ''
-  shipping_sku: ''
+  warehouse_code: 'N/A'
+  shipping_sku: 'N/A'
   types:
     default: 0
 stock:

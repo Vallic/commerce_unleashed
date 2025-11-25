@@ -110,10 +110,7 @@ class UnleashedManager implements UnleashedManagerInterface {
     }
 
     if ($this->syncFullProduct()) {
-      $response = $this->unleashedClient->getProduct($payload['Guid']);
-      if (isset($response['Items'][0])) {
-        $payload = $response['Items'][0];
-      }
+      $payload = $this->unleashedClient->getProduct($payload['Guid']) ?? $payload;
     }
 
     $unleashed_product__variation_event = new UnleashedProductVariationEvent($product_variation, $payload, $save_product_variation);
