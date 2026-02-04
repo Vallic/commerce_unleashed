@@ -38,7 +38,7 @@ class UnleashedCommands extends DrushCommands {
    * @param string $sku
    *   The specific product sku.
    * @param int $full_sync
-   *    The full or partial sync.
+   *   The full or partial sync.
    * @param array $options
    *   The options passed to this drush function.
    *
