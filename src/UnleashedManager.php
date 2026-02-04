@@ -168,7 +168,7 @@ class UnleashedManager implements UnleashedManagerInterface {
   /**
    * Generic payload build for both sales and purchase orders.
    */
-  protected function getOrderPayload(OrderInterface $order, $type = self::UNLEASHED_SALES_ORDERS): array {
+  public function getOrderPayload(OrderInterface $order, $type = self::UNLEASHED_SALES_ORDERS): array {
     $currency = $order->getTotalPrice()->getCurrencyCode();
     $payload = [
       'Guid' => $order->uuid(),
@@ -230,8 +230,7 @@ class UnleashedManager implements UnleashedManagerInterface {
             $subtotal = $subtotal->subtract($adjustment->getAmount());
           }
         }
-
-        if ($adjustment->getType() === 'promotion') {
+        else {
           $promotion_item_total = $promotion_item_total->add($adjustment->getAmount());
           $promotion_total = $promotion_total->add($adjustment->getAmount());
           if ($adjustment->isIncluded()) {
@@ -285,8 +284,9 @@ class UnleashedManager implements UnleashedManagerInterface {
           }
         }
 
-        if ($adjustment->getType() === 'promotion') {
-          $promotion_total = $promotion_total->add($adjustment->getAmount());
+        if ($adjustment->getType() === 'shipping_promotion') {
+          $unit_price = $unit_price->add($adjustment->getAmount());
+          $line_total = $line_total->add($adjustment->getAmount());
         }
       }
 
