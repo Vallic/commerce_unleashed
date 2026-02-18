@@ -54,9 +54,9 @@ class UnleashedCommands extends DrushCommands {
         if ($last_product_sync > 0) {
           $last_modified_date = date('Y-m-d', $last_product_sync);
           $query .= '&modifiedSince=' . $last_modified_date;
-          $this->keyValueFactory->get('commerce_unleashed')->set('products', time());
         }
       }
+      $this->keyValueFactory->get('commerce_unleashed')->set('products', time());
       $this->unleashedManager->syncProducts($query);
     }
     else {
