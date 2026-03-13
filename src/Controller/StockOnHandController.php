@@ -85,7 +85,7 @@ class StockOnHandController extends ControllerBase {
       'QtyOnHand',
       'ProductGuid',
     ]);
-    $query->leftJoin('commerce_product_variation_field_data', 'v', '[s].[ProductCode] = [v].[sku]');
+    $query->innerJoin('commerce_product_variation_field_data', 'v', '[s].[ProductCode] = [v].[sku]');
     $query->fields('v', [
       'title',
       'product_id',
