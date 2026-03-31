@@ -105,6 +105,8 @@ class UnleashedManager implements UnleashedManagerInterface {
       $compare = $product_variation->getPrice()?->compareTo($price);
       if (!empty($compare)) {
         $product_variation->setPrice($price);
+      }
+      else {
         $save_product_variation = FALSE;
       }
     }
