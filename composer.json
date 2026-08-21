@@ -7,7 +7,7 @@
     "require": {
         "drupal/core": "^10 || ^11",
         "drupal/commerce": "^3",
-        "drupal/commerce_shipping": "^2",
+        "drupal/commerce_shipping": "^2 || ^3",
         "drupal/advancedqueue": "^1"
     }
 }
