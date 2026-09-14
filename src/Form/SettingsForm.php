@@ -173,7 +173,7 @@ class SettingsForm extends ConfigFormBase {
     $form['products']['page_size_full'] = [
       '#type' => 'number',
       '#title' => $this->t('Page size, full read'),
-      '#description' => $this->t('How many products to ask for per request when reading the whole catalogue. Each request genuinely materialises this many complete records, which is expensive for Unleashed to serve — they ask integrators not to use the @max maximum for that reason. Smaller pages cost more requests and less strain. Defaults to @default.', ['@max' => UnleashedManager::MAX_PAGE_SIZE, '@default' => UnleashedManager::FULL_SYNC_PAGE_SIZE]),
+      '#description' => $this->t('How many products to ask for per request when reading the whole catalog. Each request genuinely builds this many complete records, which is expensive for Unleashed to serve — they ask integrators not to use the @max maximum for that reason. Smaller pages cost more requests and less strain. Defaults to @default.', ['@max' => UnleashedManager::MAX_PAGE_SIZE, '@default' => UnleashedManager::FULL_SYNC_PAGE_SIZE]),
       '#default_value' => $config->get('products.page_size_full') ?: UnleashedManager::FULL_SYNC_PAGE_SIZE,
       '#min' => UnleashedManager::MIN_PAGE_SIZE,
       '#max' => UnleashedManager::MAX_PAGE_SIZE,
