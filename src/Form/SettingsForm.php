@@ -125,6 +125,41 @@ class SettingsForm extends ConfigFormBase {
       '#required' => TRUE,
     ];
 
+    $product_types = $this->entityTypeManager->getStorage('commerce_product_type')->loadMultiple();
+
+    $product_types_ids = [];
+    foreach ($product_types as $product_type) {
+      $product_types_ids[$product_type->id()] = $product_type->label();
+    }
+
+    $form['products']['product_type'] = [
+      '#type' => 'radios',
+      '#title' => $this->t('Default product type'),
+      '#description' => $this->t('Select the product type new products are created as. This is a PRODUCT type, not a variation type — leaving it unset falls back to the variation type above, which only works on sites where the two share a machine name.'),
+      '#options' => $product_types_ids,
+      '#default_value' => $config->get('products.product_type'),
+    ];
+
+    $form['products']['price_sync'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Update product variation price from Unleashed'),
+      '#description' => $this->t('Turn this off where the Drupal price is authoritative, or where the Unleashed price is not the price this storefront quotes. A price is still set when a variation is first created, because a variation cannot be saved without one; subscribers to the product variation event can replace it.'),
+      '#default_value' => $config->get('products.price_sync') ?? TRUE,
+    ];
+
+    $price_fields = ['DefaultSellPrice' => $this->t('Default sell price')];
+    foreach (range(1, 10) as $tier) {
+      $price_fields['SellPriceTier' . $tier] = $this->t('Sell price tier @tier', ['@tier' => $tier]);
+    }
+
+    $form['products']['price_field'] = [
+      '#type' => 'select',
+      '#title' => $this->t('Unleashed price field'),
+      '#description' => $this->t('Which price to read from the Unleashed product. Sell price tiers are how Unleashed models customer-group pricing, so a trade storefront usually wants a tier rather than the default sell price.'),
+      '#options' => $price_fields,
+      '#default_value' => $config->get('products.price_field') ?: 'DefaultSellPrice',
+    ];
+
     $stores = $this->entityTypeManager->getStorage('commerce_store')->loadMultiple();
 
     $store_ids = [];

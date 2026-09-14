@@ -89,19 +89,27 @@ class UnleashedManager implements UnleashedManagerInterface {
     $product_variation_storage = $this->entityTypeManager->getStorage('commerce_product_variation');
 
     $product_variation = $product_variation_storage->loadBySku($payload['ProductCode']);
-    $price = new Price((string) $payload['DefaultSellPrice'], $this->getCurrencyCode());
+    $price_number = $this->getPayloadPrice($payload);
+    $price = $price_number !== NULL
+      ? new Price($price_number, $this->getCurrencyCode())
+      : NULL;
 
     $save_product_variation = TRUE;
     if (!$product_variation) {
-      $product_variation = $product_variation_storage->create([
+      $values = [
         'type' => $this->getVariationType(),
         'sku' => $payload['ProductCode'],
         'title' => $payload['ProductDescription'],
-        'price' => $price,
-      ]);
+      ];
+      // A variation cannot be created without a price, so one is still set on
+      // insert even when price sync is off — subscribers can replace it.
+      if ($price) {
+        $values['price'] = $price;
+      }
+      $product_variation = $product_variation_storage->create($values);
     }
     // TBD: what we do update by default on regular sync.
-    else {
+    elseif ($price && $this->syncPrice()) {
       $compare = $product_variation->getPrice()?->compareTo($price);
       if (!empty($compare)) {
         $product_variation->setPrice($price);
@@ -109,6 +117,11 @@ class UnleashedManager implements UnleashedManagerInterface {
       else {
         $save_product_variation = FALSE;
       }
+    }
+    else {
+      // Nothing to update on an existing variation. A subscriber may still
+      // change it and set saveProductVariation() on the event.
+      $save_product_variation = FALSE;
     }
 
     if ($this->syncFullProduct()) {
@@ -127,7 +140,7 @@ class UnleashedManager implements UnleashedManagerInterface {
     $save_product = FALSE;
     if (!$product) {
       $product = Product::create([
-        'type' => $this->getVariationType(),
+        'type' => $this->getProductType(),
         'title' => $payload['ProductDescription'],
         'stores' => [$this->getStoreId()],
         'variations' => [$product_variation->id()],
@@ -480,6 +493,56 @@ class UnleashedManager implements UnleashedManagerInterface {
    */
   public function getVariationType(): string {
     return $this->unleashedSettings()->get('products.type');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getProductType(): string {
+    // Falls back to the variation type so that a site upgrading from before
+    // this setting existed behaves exactly as it did.
+    $product_type = (string) ($this->unleashedSettings()->get('products.product_type') ?? '');
+
+    return $product_type !== '' ? $product_type : $this->getVariationType();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function syncPrice(): bool {
+    // Defaults to TRUE: before this setting existed the price was always
+    // written, and a site that has not opted out should keep that behaviour.
+    $sync = $this->unleashedSettings()->get('products.price_sync');
+
+    return $sync === NULL ? TRUE : (bool) $sync;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getPriceField(): string {
+    $field = (string) ($this->unleashedSettings()->get('products.price_field') ?? '');
+
+    return $field !== '' ? $field : 'DefaultSellPrice';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getPayloadPrice(array $payload): ?string {
+    $value = $payload[$this->getPriceField()] ?? NULL;
+
+    // Sell price tiers are objects — {Value, ...} — while DefaultSellPrice is
+    // a bare number. Both are accepted so the setting can name either.
+    if (is_array($value)) {
+      $value = $value['Value'] ?? NULL;
+    }
+
+    if ($value === NULL || $value === '') {
+      return NULL;
+    }
+
+    return (string) $value;
   }
 
   /**

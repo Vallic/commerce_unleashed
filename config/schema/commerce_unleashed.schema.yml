@@ -26,6 +26,15 @@ commerce_unleashed.settings:
         type:
           type: string
           label: 'Default variation type'
+        product_type:
+          type: string
+          label: 'Default product type'
+        price_sync:
+          type: boolean
+          label: 'Update variation price from Unleashed'
+        price_field:
+          type: string
+          label: 'Unleashed price field'
         store:
           type: string
           label: 'Default store'
