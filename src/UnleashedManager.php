@@ -24,6 +24,34 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  */
 class UnleashedManager implements UnleashedManagerInterface {
 
+  /**
+   * Page size for a delta read.
+   *
+   * Page size is a cap, not a promise: a modifiedSince read returns only what
+   * moved, so a large page costs Unleashed little and saves us requests.
+   */
+  public const DEFAULT_PAGE_SIZE = 500;
+
+  /**
+   * Page size for a read of the whole catalogue.
+   *
+   * A full read genuinely materialises this many complete records per request,
+   * which is expensive for Unleashed to serve - they have asked integrators
+   * not to use the 1000 maximum for exactly that reason. Smaller pages cost
+   * more requests and less strain, and that trade is deliberate here.
+   */
+  public const FULL_SYNC_PAGE_SIZE = 200;
+
+  /**
+   * Bounds the Unleashed API accepts for pageSize.
+   */
+  public const MIN_PAGE_SIZE = 1;
+
+  /**
+   * Largest page size the API accepts.
+   */
+  public const MAX_PAGE_SIZE = 1000;
+
   protected UnleashedClient $unleashedClient;
 
   protected ImmutableConfig $unleashedSettings;
@@ -43,6 +71,7 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function syncProducts(string $query = '', ?int $page_number = NULL): void {
+    $query = $this->withPageSize($query, $this->getProductsPageSize($query));
     $products = $this->unleashedClient->getProducts($query, $page_number);
     $pages = $products['Pagination']['NumberOfPages'];
     $page_number = $products['Pagination']['PageNumber'];
@@ -400,7 +429,7 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function syncStockOnHand($page_number = NULL): void {
-    $data = $this->unleashedClient->getStockOnHand('pageSize=100', $page_number);
+    $data = $this->unleashedClient->getStockOnHand('pageSize=' . $this->getStockPageSize(), $page_number);
     $pages = $data['Pagination']['NumberOfPages'];
     $page_number = $data['Pagination']['PageNumber'];
 
@@ -493,6 +522,50 @@ class UnleashedManager implements UnleashedManagerInterface {
    */
   public function getVariationType(): string {
     return $this->unleashedSettings()->get('products.type');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getProductsPageSize(string $query = ''): int {
+    // A read carrying modifiedSince is a delta; anything else walks the whole
+    // catalogue. Derived from the query rather than passed in, so cron, Drush
+    // and any other caller get the same treatment without having to say so.
+    $is_delta = stripos($query, 'modifiedSince') !== FALSE;
+    $key = $is_delta ? 'products.page_size' : 'products.page_size_full';
+    $default = $is_delta ? self::DEFAULT_PAGE_SIZE : self::FULL_SYNC_PAGE_SIZE;
+
+    return $this->clampPageSize($this->unleashedSettings()->get($key), $default);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getStockPageSize(): int {
+    return $this->clampPageSize(
+      $this->unleashedSettings()->get('stock.page_size'),
+      self::DEFAULT_PAGE_SIZE
+    );
+  }
+
+  /**
+   * Applies a page size to a query, leaving an explicit one alone.
+   */
+  protected function withPageSize(string $query, int $page_size): string {
+    if (stripos($query, 'pageSize') !== FALSE) {
+      return $query;
+    }
+
+    return $query === '' ? 'pageSize=' . $page_size : $query . '&pageSize=' . $page_size;
+  }
+
+  /**
+   * Keeps a configured page size inside the range the API accepts.
+   */
+  protected function clampPageSize(mixed $configured, int $default): int {
+    $size = is_numeric($configured) ? (int) $configured : $default;
+
+    return max(self::MIN_PAGE_SIZE, min($size, self::MAX_PAGE_SIZE));
   }
 
   /**

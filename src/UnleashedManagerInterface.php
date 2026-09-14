@@ -109,6 +109,24 @@ interface UnleashedManagerInterface {
   public function getProductType(): string;
 
   /**
+   * The page size to read products with.
+   *
+   * A read carrying modifiedSince is a delta and can afford a large page,
+   * because the response only contains what moved. A read of the whole
+   * catalogue materialises that many complete records per request, which is
+   * expensive for Unleashed to serve, so it uses a smaller one.
+   *
+   * @param string $query
+   *   The query the read will be made with.
+   */
+  public function getProductsPageSize(string $query = ''): int;
+
+  /**
+   * The page size to read stock on hand with.
+   */
+  public function getStockPageSize(): int;
+
+  /**
    * Whether an existing variation's price is updated from Unleashed.
    *
    * Sites whose Drupal price is authoritative — or whose Unleashed price is a

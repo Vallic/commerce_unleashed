@@ -2,6 +2,7 @@
 
 namespace Drupal\commerce_unleashed\Form;
 
+use Drupal\commerce_unleashed\UnleashedManager;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -158,6 +159,24 @@ class SettingsForm extends ConfigFormBase {
       '#description' => $this->t('Which price to read from the Unleashed product. Sell price tiers are how Unleashed models customer-group pricing, so a trade storefront usually wants a tier rather than the default sell price.'),
       '#options' => $price_fields,
       '#default_value' => $config->get('products.price_field') ?: 'DefaultSellPrice',
+    ];
+
+    $form['products']['page_size'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Page size, delta read'),
+      '#description' => $this->t('How many products to ask for per request when reading only what changed. A delta returns just the modified records, so a large page costs Unleashed little and saves requests. Defaults to @default.', ['@default' => UnleashedManager::DEFAULT_PAGE_SIZE]),
+      '#default_value' => $config->get('products.page_size') ?: UnleashedManager::DEFAULT_PAGE_SIZE,
+      '#min' => UnleashedManager::MIN_PAGE_SIZE,
+      '#max' => UnleashedManager::MAX_PAGE_SIZE,
+    ];
+
+    $form['products']['page_size_full'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Page size, full read'),
+      '#description' => $this->t('How many products to ask for per request when reading the whole catalogue. Each request genuinely materialises this many complete records, which is expensive for Unleashed to serve — they ask integrators not to use the @max maximum for that reason. Smaller pages cost more requests and less strain. Defaults to @default.', ['@max' => UnleashedManager::MAX_PAGE_SIZE, '@default' => UnleashedManager::FULL_SYNC_PAGE_SIZE]),
+      '#default_value' => $config->get('products.page_size_full') ?: UnleashedManager::FULL_SYNC_PAGE_SIZE,
+      '#min' => UnleashedManager::MIN_PAGE_SIZE,
+      '#max' => UnleashedManager::MAX_PAGE_SIZE,
     ];
 
     $stores = $this->entityTypeManager->getStorage('commerce_store')->loadMultiple();
@@ -331,6 +350,15 @@ class SettingsForm extends ConfigFormBase {
       '#description' => $this->t('Synchronize stock on hand.'),
       '#default_value' => $config->get('stock.sync') ?? FALSE,
       '#required' => FALSE,
+    ];
+
+    $form['stock']['page_size'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Page size'),
+      '#description' => $this->t('How many stock-on-hand rows to ask for per request. Defaults to @default.', ['@default' => UnleashedManager::DEFAULT_PAGE_SIZE]),
+      '#default_value' => $config->get('stock.page_size') ?: UnleashedManager::DEFAULT_PAGE_SIZE,
+      '#min' => UnleashedManager::MIN_PAGE_SIZE,
+      '#max' => UnleashedManager::MAX_PAGE_SIZE,
     ];
 
     $form['stock']['availability'] = [
