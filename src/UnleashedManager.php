@@ -412,7 +412,12 @@ class UnleashedManager implements UnleashedManagerInterface {
    */
   public function getStockOnHand(ProductVariationInterface $product_variation): int {
     $stock = $this->connection->select(self::UNLEASHED_STOCK_TABLE, 's')->fields('s', ['AvailableQty'])->condition('ProductCode', $product_variation->getSku())->execute()->fetchField();
-    return !is_null($stock) ? (int) $stock : UnleashedManagerInterface::UNLEASHED_NON_MANAGED;
+    // fetchField() returns FALSE for no row, never NULL, so an is_null()
+    // guard never fires and an unknown SKU was cast to 0 — reported as out
+    // of stock rather than as not tracked here.
+    return $stock !== FALSE && $stock !== NULL
+      ? (int) $stock
+      : UnleashedManagerInterface::UNLEASHED_NON_MANAGED;
   }
 
   /**
