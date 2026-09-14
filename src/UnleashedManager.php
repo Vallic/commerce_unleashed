@@ -33,9 +33,9 @@ class UnleashedManager implements UnleashedManagerInterface {
   public const DEFAULT_PAGE_SIZE = 500;
 
   /**
-   * Page size for a read of the whole catalogue.
+   * Page size for a read of the whole catalog.
    *
-   * A full read genuinely materialises this many complete records per request,
+   * A full read genuinely builds this many complete records per request,
    * which is expensive for Unleashed to serve - they have asked integrators
    * not to use the 1000 maximum for exactly that reason. Smaller pages cost
    * more requests and less strain, and that trade is deliberate here.
@@ -529,7 +529,7 @@ class UnleashedManager implements UnleashedManagerInterface {
    */
   public function getProductsPageSize(string $query = ''): int {
     // A read carrying modifiedSince is a delta; anything else walks the whole
-    // catalogue. Derived from the query rather than passed in, so cron, Drush
+    // catalog. Derived from the query rather than passed in, so cron, Drush
     // and any other caller get the same treatment without having to say so.
     $is_delta = stripos($query, 'modifiedSince') !== FALSE;
     $key = $is_delta ? 'products.page_size' : 'products.page_size_full';
@@ -584,7 +584,7 @@ class UnleashedManager implements UnleashedManagerInterface {
    */
   public function syncPrice(): bool {
     // Defaults to TRUE: before this setting existed the price was always
-    // written, and a site that has not opted out should keep that behaviour.
+    // written, and a site that has not opted out should keep that behavior.
     $sync = $this->unleashedSettings()->get('products.price_sync');
 
     return $sync === NULL ? TRUE : (bool) $sync;

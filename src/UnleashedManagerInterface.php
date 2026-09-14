@@ -113,7 +113,7 @@ interface UnleashedManagerInterface {
    *
    * A read carrying modifiedSince is a delta and can afford a large page,
    * because the response only contains what moved. A read of the whole
-   * catalogue materialises that many complete records per request, which is
+   * catalog builds that many complete records per request, which is
    * expensive for Unleashed to serve, so it uses a smaller one.
    *
    * @param string $query
