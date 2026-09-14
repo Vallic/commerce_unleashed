@@ -2,6 +2,7 @@
 
 namespace Drupal\commerce_unleashed\Form;
 
+use Drupal\commerce_unleashed\UnleashedManager;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -123,6 +124,59 @@ class SettingsForm extends ConfigFormBase {
       '#options' => $variation_types_ids,
       '#default_value' => $config->get('products.type'),
       '#required' => TRUE,
+    ];
+
+    $product_types = $this->entityTypeManager->getStorage('commerce_product_type')->loadMultiple();
+
+    $product_types_ids = [];
+    foreach ($product_types as $product_type) {
+      $product_types_ids[$product_type->id()] = $product_type->label();
+    }
+
+    $form['products']['product_type'] = [
+      '#type' => 'radios',
+      '#title' => $this->t('Default product type'),
+      '#description' => $this->t('Select the product type new products are created as. This is a PRODUCT type, not a variation type — leaving it unset falls back to the variation type above, which only works on sites where the two share a machine name.'),
+      '#options' => $product_types_ids,
+      '#default_value' => $config->get('products.product_type'),
+    ];
+
+    $form['products']['price_sync'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Update product variation price from Unleashed'),
+      '#description' => $this->t('Turn this off where the Drupal price is authoritative, or where the Unleashed price is not the price this storefront quotes. A price is still set when a variation is first created, because a variation cannot be saved without one; subscribers to the product variation event can replace it.'),
+      '#default_value' => $config->get('products.price_sync') ?? TRUE,
+    ];
+
+    $price_fields = ['DefaultSellPrice' => $this->t('Default sell price')];
+    foreach (range(1, 10) as $tier) {
+      $price_fields['SellPriceTier' . $tier] = $this->t('Sell price tier @tier', ['@tier' => $tier]);
+    }
+
+    $form['products']['price_field'] = [
+      '#type' => 'select',
+      '#title' => $this->t('Unleashed price field'),
+      '#description' => $this->t('Which price to read from the Unleashed product. Sell price tiers are how Unleashed models customer-group pricing, so a trade storefront usually wants a tier rather than the default sell price.'),
+      '#options' => $price_fields,
+      '#default_value' => $config->get('products.price_field') ?: 'DefaultSellPrice',
+    ];
+
+    $form['products']['page_size'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Page size, delta read'),
+      '#description' => $this->t('How many products to ask for per request when reading only what changed. A delta returns just the modified records, so a large page costs Unleashed little and saves requests. Defaults to @default.', ['@default' => UnleashedManager::DEFAULT_PAGE_SIZE]),
+      '#default_value' => $config->get('products.page_size') ?: UnleashedManager::DEFAULT_PAGE_SIZE,
+      '#min' => UnleashedManager::MIN_PAGE_SIZE,
+      '#max' => UnleashedManager::MAX_PAGE_SIZE,
+    ];
+
+    $form['products']['page_size_full'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Page size, full read'),
+      '#description' => $this->t('How many products to ask for per request when reading the whole catalogue. Each request genuinely materialises this many complete records, which is expensive for Unleashed to serve — they ask integrators not to use the @max maximum for that reason. Smaller pages cost more requests and less strain. Defaults to @default.', ['@max' => UnleashedManager::MAX_PAGE_SIZE, '@default' => UnleashedManager::FULL_SYNC_PAGE_SIZE]),
+      '#default_value' => $config->get('products.page_size_full') ?: UnleashedManager::FULL_SYNC_PAGE_SIZE,
+      '#min' => UnleashedManager::MIN_PAGE_SIZE,
+      '#max' => UnleashedManager::MAX_PAGE_SIZE,
     ];
 
     $stores = $this->entityTypeManager->getStorage('commerce_store')->loadMultiple();
@@ -296,6 +350,15 @@ class SettingsForm extends ConfigFormBase {
       '#description' => $this->t('Synchronize stock on hand.'),
       '#default_value' => $config->get('stock.sync') ?? FALSE,
       '#required' => FALSE,
+    ];
+
+    $form['stock']['page_size'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Page size'),
+      '#description' => $this->t('How many stock-on-hand rows to ask for per request. Defaults to @default.', ['@default' => UnleashedManager::DEFAULT_PAGE_SIZE]),
+      '#default_value' => $config->get('stock.page_size') ?: UnleashedManager::DEFAULT_PAGE_SIZE,
+      '#min' => UnleashedManager::MIN_PAGE_SIZE,
+      '#max' => UnleashedManager::MAX_PAGE_SIZE,
     ];
 
     $form['stock']['availability'] = [

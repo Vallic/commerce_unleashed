@@ -101,6 +101,56 @@ interface UnleashedManagerInterface {
   public function getStoreId(): string;
 
   /**
+   * The product type new products are created as.
+   *
+   * Falls back to the variation type when unset, which is what the module did
+   * before this setting existed.
+   */
+  public function getProductType(): string;
+
+  /**
+   * The page size to read products with.
+   *
+   * A read carrying modifiedSince is a delta and can afford a large page,
+   * because the response only contains what moved. A read of the whole
+   * catalogue materialises that many complete records per request, which is
+   * expensive for Unleashed to serve, so it uses a smaller one.
+   *
+   * @param string $query
+   *   The query the read will be made with.
+   */
+  public function getProductsPageSize(string $query = ''): int;
+
+  /**
+   * The page size to read stock on hand with.
+   */
+  public function getStockPageSize(): int;
+
+  /**
+   * Whether an existing variation's price is updated from Unleashed.
+   *
+   * Sites whose Drupal price is authoritative — or whose Unleashed price is a
+   * different price to the one the storefront quotes — turn this off and map
+   * the price themselves from the product variation event.
+   */
+  public function syncPrice(): bool;
+
+  /**
+   * The Unleashed payload field the price is read from.
+   *
+   * DefaultSellPrice by default; may name a sell price tier instead.
+   */
+  public function getPriceField(): string;
+
+  /**
+   * Reads the configured price out of an Unleashed product payload.
+   *
+   * @return string|null
+   *   The price as a numeric string, or NULL when the payload has none.
+   */
+  public function getPayloadPrice(array $payload): ?string;
+
+  /**
    * Get the default currency code.
    */
   public function getCurrencyCode(): string;

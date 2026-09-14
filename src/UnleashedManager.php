@@ -24,6 +24,34 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  */
 class UnleashedManager implements UnleashedManagerInterface {
 
+  /**
+   * Page size for a delta read.
+   *
+   * Page size is a cap, not a promise: a modifiedSince read returns only what
+   * moved, so a large page costs Unleashed little and saves us requests.
+   */
+  public const DEFAULT_PAGE_SIZE = 500;
+
+  /**
+   * Page size for a read of the whole catalogue.
+   *
+   * A full read genuinely materialises this many complete records per request,
+   * which is expensive for Unleashed to serve - they have asked integrators
+   * not to use the 1000 maximum for exactly that reason. Smaller pages cost
+   * more requests and less strain, and that trade is deliberate here.
+   */
+  public const FULL_SYNC_PAGE_SIZE = 200;
+
+  /**
+   * Bounds the Unleashed API accepts for pageSize.
+   */
+  public const MIN_PAGE_SIZE = 1;
+
+  /**
+   * Largest page size the API accepts.
+   */
+  public const MAX_PAGE_SIZE = 1000;
+
   protected UnleashedClient $unleashedClient;
 
   protected ImmutableConfig $unleashedSettings;
@@ -43,6 +71,7 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function syncProducts(string $query = '', ?int $page_number = NULL): void {
+    $query = $this->withPageSize($query, $this->getProductsPageSize($query));
     $products = $this->unleashedClient->getProducts($query, $page_number);
     $pages = $products['Pagination']['NumberOfPages'];
     $page_number = $products['Pagination']['PageNumber'];
@@ -89,19 +118,27 @@ class UnleashedManager implements UnleashedManagerInterface {
     $product_variation_storage = $this->entityTypeManager->getStorage('commerce_product_variation');
 
     $product_variation = $product_variation_storage->loadBySku($payload['ProductCode']);
-    $price = new Price((string) $payload['DefaultSellPrice'], $this->getCurrencyCode());
+    $price_number = $this->getPayloadPrice($payload);
+    $price = $price_number !== NULL
+      ? new Price($price_number, $this->getCurrencyCode())
+      : NULL;
 
     $save_product_variation = TRUE;
     if (!$product_variation) {
-      $product_variation = $product_variation_storage->create([
+      $values = [
         'type' => $this->getVariationType(),
         'sku' => $payload['ProductCode'],
         'title' => $payload['ProductDescription'],
-        'price' => $price,
-      ]);
+      ];
+      // A variation cannot be created without a price, so one is still set on
+      // insert even when price sync is off — subscribers can replace it.
+      if ($price) {
+        $values['price'] = $price;
+      }
+      $product_variation = $product_variation_storage->create($values);
     }
     // TBD: what we do update by default on regular sync.
-    else {
+    elseif ($price && $this->syncPrice()) {
       $compare = $product_variation->getPrice()?->compareTo($price);
       if (!empty($compare)) {
         $product_variation->setPrice($price);
@@ -109,6 +146,11 @@ class UnleashedManager implements UnleashedManagerInterface {
       else {
         $save_product_variation = FALSE;
       }
+    }
+    else {
+      // Nothing to update on an existing variation. A subscriber may still
+      // change it and set saveProductVariation() on the event.
+      $save_product_variation = FALSE;
     }
 
     if ($this->syncFullProduct()) {
@@ -127,7 +169,7 @@ class UnleashedManager implements UnleashedManagerInterface {
     $save_product = FALSE;
     if (!$product) {
       $product = Product::create([
-        'type' => $this->getVariationType(),
+        'type' => $this->getProductType(),
         'title' => $payload['ProductDescription'],
         'stores' => [$this->getStoreId()],
         'variations' => [$product_variation->id()],
@@ -387,7 +429,7 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function syncStockOnHand($page_number = NULL): void {
-    $data = $this->unleashedClient->getStockOnHand('pageSize=100', $page_number);
+    $data = $this->unleashedClient->getStockOnHand('pageSize=' . $this->getStockPageSize(), $page_number);
     $pages = $data['Pagination']['NumberOfPages'];
     $page_number = $data['Pagination']['PageNumber'];
 
@@ -412,7 +454,12 @@ class UnleashedManager implements UnleashedManagerInterface {
    */
   public function getStockOnHand(ProductVariationInterface $product_variation): int {
     $stock = $this->connection->select(self::UNLEASHED_STOCK_TABLE, 's')->fields('s', ['AvailableQty'])->condition('ProductCode', $product_variation->getSku())->execute()->fetchField();
-    return !is_null($stock) ? (int) $stock : UnleashedManagerInterface::UNLEASHED_NON_MANAGED;
+    // fetchField() returns FALSE for no row, never NULL, so an is_null()
+    // guard never fires and an unknown SKU was cast to 0 — reported as out
+    // of stock rather than as not tracked here.
+    return $stock !== FALSE && $stock !== NULL
+      ? (int) $stock
+      : UnleashedManagerInterface::UNLEASHED_NON_MANAGED;
   }
 
   /**
@@ -432,14 +479,14 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function getApiId(): string {
-    return $this->unleashedSettings()->get('api_id');
+    return (string) ($this->unleashedSettings()->get('api_id') ?? '');
   }
 
   /**
    * {@inheritdoc}
    */
   public function getApiKey(): string {
-    return $this->unleashedSettings()->get('api_key');
+    return (string) ($this->unleashedSettings()->get('api_key') ?? '');
   }
 
   /**
@@ -475,6 +522,100 @@ class UnleashedManager implements UnleashedManagerInterface {
    */
   public function getVariationType(): string {
     return $this->unleashedSettings()->get('products.type');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getProductsPageSize(string $query = ''): int {
+    // A read carrying modifiedSince is a delta; anything else walks the whole
+    // catalogue. Derived from the query rather than passed in, so cron, Drush
+    // and any other caller get the same treatment without having to say so.
+    $is_delta = stripos($query, 'modifiedSince') !== FALSE;
+    $key = $is_delta ? 'products.page_size' : 'products.page_size_full';
+    $default = $is_delta ? self::DEFAULT_PAGE_SIZE : self::FULL_SYNC_PAGE_SIZE;
+
+    return $this->clampPageSize($this->unleashedSettings()->get($key), $default);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getStockPageSize(): int {
+    return $this->clampPageSize(
+      $this->unleashedSettings()->get('stock.page_size'),
+      self::DEFAULT_PAGE_SIZE
+    );
+  }
+
+  /**
+   * Applies a page size to a query, leaving an explicit one alone.
+   */
+  protected function withPageSize(string $query, int $page_size): string {
+    if (stripos($query, 'pageSize') !== FALSE) {
+      return $query;
+    }
+
+    return $query === '' ? 'pageSize=' . $page_size : $query . '&pageSize=' . $page_size;
+  }
+
+  /**
+   * Keeps a configured page size inside the range the API accepts.
+   */
+  protected function clampPageSize(mixed $configured, int $default): int {
+    $size = is_numeric($configured) ? (int) $configured : $default;
+
+    return max(self::MIN_PAGE_SIZE, min($size, self::MAX_PAGE_SIZE));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getProductType(): string {
+    // Falls back to the variation type so that a site upgrading from before
+    // this setting existed behaves exactly as it did.
+    $product_type = (string) ($this->unleashedSettings()->get('products.product_type') ?? '');
+
+    return $product_type !== '' ? $product_type : $this->getVariationType();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function syncPrice(): bool {
+    // Defaults to TRUE: before this setting existed the price was always
+    // written, and a site that has not opted out should keep that behaviour.
+    $sync = $this->unleashedSettings()->get('products.price_sync');
+
+    return $sync === NULL ? TRUE : (bool) $sync;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getPriceField(): string {
+    $field = (string) ($this->unleashedSettings()->get('products.price_field') ?? '');
+
+    return $field !== '' ? $field : 'DefaultSellPrice';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getPayloadPrice(array $payload): ?string {
+    $value = $payload[$this->getPriceField()] ?? NULL;
+
+    // Sell price tiers are objects — {Value, ...} — while DefaultSellPrice is
+    // a bare number. Both are accepted so the setting can name either.
+    if (is_array($value)) {
+      $value = $value['Value'] ?? NULL;
+    }
+
+    if ($value === NULL || $value === '') {
+      return NULL;
+    }
+
+    return (string) $value;
   }
 
   /**

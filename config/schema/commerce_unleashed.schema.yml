@@ -26,6 +26,21 @@ commerce_unleashed.settings:
         type:
           type: string
           label: 'Default variation type'
+        product_type:
+          type: string
+          label: 'Default product type'
+        price_sync:
+          type: boolean
+          label: 'Update variation price from Unleashed'
+        price_field:
+          type: string
+          label: 'Unleashed price field'
+        page_size:
+          type: integer
+          label: 'Page size for a delta product read'
+        page_size_full:
+          type: integer
+          label: 'Page size for a full product read'
         store:
           type: string
           label: 'Default store'
@@ -75,6 +90,9 @@ commerce_unleashed.settings:
     stock:
       type: mapping
       mapping:
+        page_size:
+          type: integer
+          label: 'Page size for a stock read'
         sync:
           type: boolean
           label: 'Sync stock'

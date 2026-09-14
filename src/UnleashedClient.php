@@ -136,8 +136,8 @@ class UnleashedClient {
    *
    * @see https://apidocs.unleashedsoftware.com/Purchases
    */
-  public function getPurchaseOrders($query = ''): array {
-    return $this->request('GET', 'PurchaseOrders', [], $query);
+  public function getPurchaseOrders(string $query = '', ?int $page_number = NULL): array {
+    return $this->request('GET', $page_number ? 'PurchaseOrders/' . $page_number : 'PurchaseOrders', [], $query);
   }
 
   /**
@@ -190,8 +190,8 @@ class UnleashedClient {
    *
    * @see https://apidocs.unleashedsoftware.com/SalesOrders
    */
-  public function getSalesOrders($query = ''): array {
-    return $this->request('GET', 'SalesOrders', [], $query);
+  public function getSalesOrders(string $query = '', ?int $page_number = NULL): array {
+    return $this->request('GET', $page_number ? 'SalesOrders/' . $page_number : 'SalesOrders', [], $query);
   }
 
   /**
