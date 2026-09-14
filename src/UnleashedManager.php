@@ -432,14 +432,14 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function getApiId(): string {
-    return $this->unleashedSettings()->get('api_id');
+    return (string) ($this->unleashedSettings()->get('api_id') ?? '');
   }
 
   /**
    * {@inheritdoc}
    */
   public function getApiKey(): string {
-    return $this->unleashedSettings()->get('api_key');
+    return (string) ($this->unleashedSettings()->get('api_key') ?? '');
   }
 
   /**
