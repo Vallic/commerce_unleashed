@@ -29,6 +29,11 @@ class UnleashedAvailabilityChecker implements AvailabilityCheckerInterface {
   public function check(OrderItemInterface $order_item, Context $context): AvailabilityResult {
     if ($this->unleashedManager->enforceStockAvailability()) {
       $purchased_entity = $order_item->getPurchasedEntity();
+      if (!$purchased_entity instanceof ProductVariationInterface) {
+        // Stock is tracked against product variations; anything else is not
+        // something Unleashed can answer for, so it is not blocked either.
+        return AvailabilityResult::neutral();
+      }
       $quantity = (int) $order_item->getQuantity();
       $on_hand = $this->unleashedManager->getStockOnHand($purchased_entity);
       if ($on_hand === 0) {

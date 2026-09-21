@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\commerce_unleashed_invoice\Hook;
 
+use Drupal\advancedqueue\Entity\QueueInterface;
 use Drupal\advancedqueue\Job;
 use Drupal\commerce_order\Entity\OrderInterface;
 use Drupal\commerce_unleashed_invoice\InvoiceSync;
@@ -76,7 +77,9 @@ final class OrderHooks {
     // Queued by default: the read is an HTTP call to a third party, and an
     // order should not fail to save, or hang, because Unleashed is slow.
     $queue = $this->entityTypeManager->getStorage('advancedqueue_queue')->load('commerce_unleashed');
-    $queue?->enqueueJob(Job::create('commerce_unleashed_invoice', ['order_id' => $order->id()]));
+    if ($queue instanceof QueueInterface) {
+      $queue->enqueueJob(Job::create('commerce_unleashed_invoice', ['order_id' => $order->id()]));
+    }
   }
 
 }

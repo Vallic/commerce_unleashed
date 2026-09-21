@@ -25,6 +25,12 @@ use Drupal\Core\Logger\LoggerChannelInterface;
  * That is affordable because credit notes are rare next to invoices - a few
  * thousand against nearly a million - and `modifiedSince` narrows a repeat run
  * to what has changed.
+ *
+ * Only credits that can be attached to an order here are mirrored. Most of a
+ * tenant's credits are raised against orders this site has never seen, and a
+ * `FreeCredit` has no order at all; mirroring those would fill the invoice
+ * list with records belonging to nobody. The count is reported so a run that
+ * skips most of what it read says so rather than looking like it did nothing.
  */
 final class CreditNoteSync {
 
@@ -170,7 +176,8 @@ final class CreditNoteSync {
    * Creates or updates the invoice for one credit note.
    *
    * @return string
-   *   'created', 'updated', 'unchanged' or 'skipped'.
+   *   'created', 'updated', 'unchanged', or 'skipped' when the credit has no
+   *   order in this site to belong to.
    */
   private function apply(UnleashedCreditNotePayload $payload): string {
     $number = $payload->creditNumber();
@@ -183,12 +190,25 @@ final class CreditNoteSync {
     $invoice = $this->loadCredit($number);
     $new = $invoice === NULL;
 
+    if ($order === NULL) {
+      // A credit this site cannot attach to an order is not mirrored. Most
+      // credits in a tenant are raised against orders Drupal has never seen -
+      // POS sales, and orders older or newer than whatever was migrated - and
+      // a free credit has no order at all. Mirroring those would fill the
+      // invoice list with records belonging to nobody, reachable from nothing.
+      //
+      // A credit already mirrored is LEFT AS IT IS rather than deleted: the
+      // order may simply be absent from this run's view, and removing a
+      // record a customer has seen is worse than keeping a stale one.
+      return 'skipped';
+    }
+
     if ($new) {
       $invoice = $storage->create([
         'type' => self::CREDIT_TYPE,
-        'store_id' => $order?->getStoreId() ?? $this->defaultStoreId(),
-        'uid' => $order?->getCustomerId() ?? 0,
-        'mail' => $order?->getEmail(),
+        'store_id' => $order->getStoreId(),
+        'uid' => $order->getCustomerId(),
+        'mail' => $order->getEmail(),
       ]);
     }
 
@@ -200,8 +220,7 @@ final class CreditNoteSync {
     $invoice->setInvoiceNumber($number);
     $invoice->set('state', $payload->state());
     $invoice->set('invoice_date', $payload->creditDate());
-    // A free credit stands alone; everything else hangs off its sales order.
-    $invoice->set('orders', $order ? [$order->id()] : []);
+    $invoice->set('orders', [$order->id()]);
     $invoice->set('data', [
       'unleashed' => [
         'guid' => $payload->guid(),
@@ -320,15 +339,6 @@ final class CreditNoteSync {
       'source_id' => 'unleashed|' . $payload->creditNumber(),
       'included' => FALSE,
     ]));
-  }
-
-  /**
-   * The store a credit with no order is filed against.
-   */
-  private function defaultStoreId(): ?int {
-    $configured = $this->configFactory->get('commerce_unleashed.settings')->get('products.store');
-
-    return $configured ? (int) $configured : NULL;
   }
 
   /**

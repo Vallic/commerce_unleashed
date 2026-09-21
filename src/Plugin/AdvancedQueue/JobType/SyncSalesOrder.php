@@ -3,6 +3,7 @@
 namespace Drupal\commerce_unleashed\Plugin\AdvancedQueue\JobType;
 
 use Drupal\advancedqueue\Job;
+use Drupal\commerce_order\Entity\OrderInterface;
 use Drupal\advancedqueue\JobResult;
 
 /**
@@ -25,7 +26,7 @@ class SyncSalesOrder extends AbstractOrderSync {
     $entity_id = $payload['order_id'];
     $entity_storage = $this->entityTypeManager->getStorage('commerce_order');
     $entity = $entity_storage->load($entity_id);
-    if (!$entity) {
+    if (!$entity instanceof OrderInterface) {
       return JobResult::failure(sprintf('Order with id "%s" not found.', $entity_id));
     }
 

@@ -5,6 +5,7 @@ namespace Drupal\commerce_unleashed;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Logger\LoggerChannelTrait;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\ClientInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
@@ -53,7 +54,11 @@ class UnleashedClient {
     catch (\Exception $exception) {
       $error = $exception->getMessage();
       $this->getLogger('commerce_unleashed')->error($error);
-      $data = Json::decode($exception->getResponse()->getBody()) ?? [];
+      // Only a request exception carries a response to read the API's own
+      // error out of; a connection failure has nothing but its message.
+      $data = $exception instanceof RequestException && $exception->hasResponse()
+        ? Json::decode((string) $exception->getResponse()?->getBody()) ?? []
+        : [];
 
       if (isset($data['Description'])) {
         return ['error' => $data['Description']];

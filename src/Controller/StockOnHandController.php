@@ -75,6 +75,12 @@ class StockOnHandController extends ControllerBase {
       ],
     ];
 
+    // ::extend() is typed as returning ExtendableInterface, which carries none
+    // of the select methods used below. The object is a TableSortExtender
+    // wrapping a PagerSelectExtender, and each extender forwards what it does
+    // not implement to the one it wraps - which is how ::limit() below reaches
+    // the pager through the sort extender.
+    /** @var \Drupal\Core\Database\Query\TableSortExtender $query */
     $query = $this->database->select('commerce_unleashed_stock_on_hand', 's')
       ->extend(PagerSelectExtender::class)
       ->extend(TableSortExtender::class);
@@ -94,10 +100,12 @@ class StockOnHandController extends ControllerBase {
       'price__currency_code',
     ]);
 
-    $result = $query
-      ->limit(50)
-      ->orderByHeader($header)
-      ->execute();
+    // ::limit() belongs to the pager, which this sort extender wraps and
+    // forwards to; static analysis only sees the outer class.
+    // @phpstan-ignore method.notFound
+    $query->limit(50);
+    $query->orderByHeader($header);
+    $result = $query->execute();
 
     foreach ($result as $item) {
       $rows[] = [

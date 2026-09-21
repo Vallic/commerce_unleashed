@@ -2,7 +2,7 @@ name: 'Commerce Unleashed Invoice'
 type: module
 description: 'Mirrors Unleashed sales invoices onto Commerce invoices. Read-only: Unleashed is the source of truth.'
 package: Commerce
-core_version_requirement: ^10.3 || ^11
+core_version_requirement: ^11
 dependencies:
   - commerce_unleashed:commerce_unleashed
   - commerce_invoice:commerce_invoice

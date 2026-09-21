@@ -94,15 +94,24 @@ mean the pages it never reached are never looked at again, because a delta from
 then on will not mention a credit note that did not change.
 
 Credit notes land in their own `unleashed_credit` invoice type, sharing the
-invoice workflow. Two things are worth knowing:
+invoice workflow.
 
-* **`CreditType: FreeCredit`** has no sales order behind it at all. It is
-  mirrored as a standalone record rather than attached to anything.
-* A credit note whose sales order **is not in this site** is still mirrored,
-  filed against the default store with no customer. Unleashed raises credits
-  against orders this site may never have seen - POS sales, or orders older or
-  newer than whatever was migrated - and dropping them would mean the mirror
-  quietly disagrees with the source. Expect a fair number of these.
+**Only credits that can be attached to an order here are mirrored.** Unleashed
+raises credits against orders this site may never have seen - POS sales, and
+orders older or newer than whatever was migrated - and a `CreditType:
+FreeCredit` has no sales order at all. Mirroring those would fill the invoice
+list with records belonging to nobody, reachable from nothing. Expect most of
+what a run reads to be skipped; the count is reported so a run that skips
+nearly everything says so rather than looking like it did nothing.
+
+One consequence worth knowing: a credit skipped because its order was not here
+yet will not be revisited by a later delta, because a delta only returns what
+has since changed in Unleashed. If orders are imported after the fact, re-read
+the period they cover with `--since`, or `--full`.
+
+A credit already mirrored whose order later goes missing is left alone rather
+than deleted: the order may simply be absent from that run's view, and removing
+a record a customer has seen is worse than keeping a stale one.
 
 The API field names differ from the documentation: the number is
 `CreditNoteNumber` and the status is `Status`, not `CreditNumber` and

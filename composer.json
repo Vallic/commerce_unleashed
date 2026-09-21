@@ -5,9 +5,13 @@
     "homepage": "http://drupal.org/project/commerce_unleashed",
     "license": "GPL-2.0+",
     "require": {
-        "drupal/core": "^10 || ^11",
+        "php": ">=8.4",
+        "drupal/core": "^11",
         "drupal/commerce": "^3",
         "drupal/commerce_shipping": "^2 || ^3",
         "drupal/advancedqueue": "^1"
+    },
+    "suggest": {
+        "drupal/commerce_invoice": "Required by the Commerce Unleashed Invoice submodule, which mirrors Unleashed sales invoices and credit notes."
     }
 }

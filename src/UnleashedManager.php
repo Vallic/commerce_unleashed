@@ -166,9 +166,14 @@ class UnleashedManager implements UnleashedManagerInterface {
     }
 
     if ($this->syncFullProduct()) {
-      $payload = $this->unleashedClient->getProduct($payload['Guid']) ?? $payload;
+      // getProduct() always returns an array - an empty one, or one carrying
+      // an error - so the fallback is on it being unusable, not on it being
+      // NULL.
+      $full = $this->unleashedClient->getProduct($payload['Guid']);
+      $payload = (!$full || isset($full['error'])) ? $payload : $full;
     }
 
+    assert($product_variation instanceof ProductVariationInterface);
     $unleashed_product__variation_event = new UnleashedProductVariationEvent($product_variation, $payload, $save_product_variation);
     $this->eventDispatcher->dispatch($unleashed_product__variation_event, UnleashedEvents::UNLEASHED_PRODUCT_VARIATION);
     $product_variation = $unleashed_product__variation_event->getProductVariation();
@@ -257,11 +262,14 @@ class UnleashedManager implements UnleashedManagerInterface {
 
     $payload[$line_items_key] = [];
     foreach ($order->getItems() as $item) {
+      $purchased_entity = $item->getPurchasedEntity();
       $item_payload = [
         'Guid' => $item->uuid(),
         'LineNumber' => $item->id(),
         'Product' => [
-          'ProductCode' => $item->getPurchasedEntity()->getSku(),
+          // Unleashed identifies a line by product code, which only a product
+          // variation carries.
+          'ProductCode' => $purchased_entity instanceof ProductVariationInterface ? $purchased_entity->getSku() : '',
         ],
         'Currency' => [
           'CurrencyCode' => $currency,
@@ -304,7 +312,8 @@ class UnleashedManager implements UnleashedManagerInterface {
       $item_payload['DiscountRate'] = $promotion_item_total->isZero() ? '0.00' : (string) abs((float) $promotion_item_total->divide($line_total->getNumber())->getNumber());
 
       if (!$promotion_item_total->isZero()) {
-        $item_payload['DiscountedUnitPrice'] = round($unit_price->multiply(1 - $item_payload['DiscountRate'])->getNumber(), 4, PHP_ROUND_HALF_UP);
+        $discounted = $unit_price->multiply((string) (1 - (float) $item_payload['DiscountRate']));
+        $item_payload['DiscountedUnitPrice'] = round((float) $discounted->getNumber(), 4, PHP_ROUND_HALF_UP);
       }
 
       $payload[$line_items_key][] = $item_payload;

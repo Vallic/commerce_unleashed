@@ -8,6 +8,11 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
+/**
+ * Shared plumbing for the order sync job types.
+ *
+ * @phpstan-consistent-constructor
+ */
 abstract class AbstractOrderSync extends JobTypeBase implements ContainerFactoryPluginInterface {
 
   protected EntityTypeManagerInterface $entityTypeManager;

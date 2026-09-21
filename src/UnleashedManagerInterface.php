@@ -60,6 +60,14 @@ interface UnleashedManagerInterface {
   public function syncSalesOrder(OrderInterface $order): array;
 
   /**
+   * Resolve the Unleashed customer for a Drupal order.
+   *
+   * @return array
+   *   The Unleashed customer, or an array carrying an 'error' key.
+   */
+  public function getCustomerFromOrder(OrderInterface $order): array;
+
+  /**
    * Sync stock on hand.
    */
   public function syncStockOnHand($page_number = NULL): void;

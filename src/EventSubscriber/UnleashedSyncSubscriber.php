@@ -3,6 +3,8 @@
 namespace Drupal\commerce_unleashed\EventSubscriber;
 
 use Drupal\advancedqueue\Job;
+use Drupal\commerce_order\Entity\OrderInterface;
+use Drupal\commerce_product\Entity\ProductVariationInterface;
 use Drupal\commerce_unleashed\UnleashedManagerInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelTrait;
@@ -31,6 +33,9 @@ class UnleashedSyncSubscriber implements EventSubscriberInterface {
    */
   public function onOrderPlace(WorkflowTransitionEvent $event): void {
     $order = $event->getEntity();
+    if (!$order instanceof OrderInterface) {
+      return;
+    }
     if ($sync_type = $this->unleashedManager->isOrderEligible($order)) {
       $queue_storage = $this->entityTypeManager->getStorage('advancedqueue_queue');
       /** @var \Drupal\advancedqueue\Entity\QueueInterface $queue */
@@ -43,7 +48,11 @@ class UnleashedSyncSubscriber implements EventSubscriberInterface {
 
       if ($this->unleashedManager->updateLocalStock($order)) {
         foreach ($order->getItems() as $item) {
-          $this->unleashedManager->updateLocalStockOnHand($item->getPurchasedEntity(), (int) $item->getQuantity());
+          $purchased_entity = $item->getPurchasedEntity();
+          // Stock is tracked against product variations only.
+          if ($purchased_entity instanceof ProductVariationInterface) {
+            $this->unleashedManager->updateLocalStockOnHand($purchased_entity, (int) $item->getQuantity());
+          }
         }
       }
     }
@@ -54,6 +63,9 @@ class UnleashedSyncSubscriber implements EventSubscriberInterface {
    */
   public function onOrderFulfill(WorkflowTransitionEvent $event): void {
     $order = $event->getEntity();
+    if (!$order instanceof OrderInterface) {
+      return;
+    }
     if ($type = $this->unleashedManager->completeOrders($order)) {
       try {
         if ($type === UnleashedManagerInterface::UNLEASHED_SALES_ORDERS) {
@@ -74,6 +86,9 @@ class UnleashedSyncSubscriber implements EventSubscriberInterface {
    */
   public function onOrderCancel(WorkflowTransitionEvent $event): void {
     $order = $event->getEntity();
+    if (!$order instanceof OrderInterface) {
+      return;
+    }
     if ($type = $this->unleashedManager->isOrderEligible($order)) {
       try {
         if ($type === UnleashedManagerInterface::UNLEASHED_SALES_ORDERS) {

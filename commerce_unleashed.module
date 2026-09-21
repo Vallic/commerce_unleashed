@@ -6,6 +6,7 @@
  */
 
 use Drupal\commerce_cart\Form\AddToCartFormInterface;
+use Drupal\commerce_product\Entity\ProductVariationInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
@@ -61,8 +62,11 @@ function commerce_unleashed_form_commerce_order_item_add_to_cart_form_alter(&$fo
       /** @var \Drupal\commerce_order\Entity\OrderItemInterface $order_item */
       $order_item = $form_object->getEntity();
 
-      // Purchasable entity to be used in the form.
-      if ($purchased_entity = $order_item->getPurchasedEntity()) {
+      // Purchasable entity to be used in the form. Stock is tracked against
+      // product variations, so anything else is not something Unleashed can
+      // answer for.
+      $purchased_entity = $order_item->getPurchasedEntity();
+      if ($purchased_entity instanceof ProductVariationInterface) {
         if ($unleashed_manager->getStockOnHand($purchased_entity) === 0) {
           $form['actions']['submit']['#disabled'] = TRUE;
           $form['actions']['submit']['#value'] = new TranslatableMarkup('Sold out');

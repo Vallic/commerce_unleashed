@@ -7,7 +7,7 @@ namespace Drupal\commerce_unleashed_invoice\Form;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\TypedData\TypedDataManagerInterface;
+use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\state_machine\WorkflowManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -18,7 +18,7 @@ final class SettingsForm extends ConfigFormBase {
 
   public function __construct(
     ConfigFactoryInterface $config_factory,
-    TypedDataManagerInterface $typed_config_manager,
+    TypedConfigManagerInterface $typed_config_manager,
     protected readonly WorkflowManagerInterface $workflowManager,
   ) {
     parent::__construct($config_factory, $typed_config_manager);
