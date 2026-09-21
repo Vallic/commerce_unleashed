@@ -26,6 +26,20 @@ interface UnleashedManagerInterface {
   public function syncProducts(string $query = '', ?int $page_number = NULL);
 
   /**
+   * Syncs one page of products, and reports where that page sat.
+   *
+   * The unit a batch works in: one API request, one pass over its items, and
+   * enough of the pagination to know whether to continue. ::syncProducts()
+   * loops over this; a batch runs one call per operation so that each page is
+   * a separate PHP request with its own memory.
+   *
+   * @return array{pages: int, page: int, items: int, total: int}
+   *   How many pages there are, which one this was, how many items it
+   *   carried, and how many products the whole read covers.
+   */
+  public function syncProductPage(string $query = '', int $page_number = 1): array;
+
+  /**
    * Sync product.
    */
   public function syncProduct(string $sku): void;
@@ -107,6 +121,31 @@ interface UnleashedManagerInterface {
    * before this setting existed.
    */
   public function getProductType(): string;
+
+  /**
+   * The query every product read starts from.
+   *
+   * Callers append their own filters to this; it carries only the options that
+   * decide WHAT a product record contains, not which products are returned.
+   *
+   * @return string
+   *   A query string, without a leading separator.
+   */
+  public function getProductsBaseQuery(): string;
+
+  /**
+   * Whether product reads ask for attribute sets.
+   *
+   * Turning this off falls back to `brief=true`, which returns seven fields
+   * per product and no attribute set. The two are mutually exclusive at the
+   * API: `brief=true` suppresses `includeAttributes`.
+   */
+  public function includeAttributes(): bool;
+
+  /**
+   * Whether product reads include products marked obsolete in Unleashed.
+   */
+  public function includeObsolete(): bool;
 
   /**
    * The page size to read products with.

@@ -95,10 +95,26 @@ class SettingsForm extends ConfigFormBase {
       '#required' => FALSE,
     ];
 
+    $form['products']['include_attributes'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Read attribute sets'),
+      '#description' => $this->t('Reads the complete product record, attribute set included. With this off, the sync asks for a brief record instead: Guid, ProductCode, ProductDescription, DefaultPurchasePrice, DefaultSellPrice, SellPriceTier1 and DefaultSupplierId, with no product group, supplier, obsolete flag or attribute set. The two are mutually exclusive at the API — a brief read returns no attributes even when they are asked for — so leave this on unless nothing you do depends on those fields.'),
+      '#default_value' => $config->get('products.include_attributes') ?? TRUE,
+      '#required' => FALSE,
+    ];
+
+    $form['products']['include_obsolete'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Include obsolete products'),
+      '#description' => $this->t('Unleashed leaves products marked obsolete out of a product read unless they are asked for. Tick this where the back catalog matters — an obsolete product is still one the store may hold stock of and have sold — and leave it off for a storefront that only lists current lines. Expect the catalog to be substantially larger with this on.'),
+      '#default_value' => $config->get('products.include_obsolete') ?? FALSE,
+      '#required' => FALSE,
+    ];
+
     $form['products']['full'] = [
       '#type' => 'checkbox',
-      '#title' => $this->t('Full product synchronization'),
-      '#description' => $this->t('By default we run a brief summary of the Product list that only includes: Guid, ProductCode, ProductDescription, DefaultPurchasePrice, DefaultSellPrice, SellPriceTier1, DefaultSupplierId. If you choose full, the entire payload will be called upon for each product during queue processing and be available in at \Drupal\commerce_unleashed\UnleashedManager::syncProductVariation'),
+      '#title' => $this->t('Fetch each product individually'),
+      '#description' => $this->t('Fetches every product again, one API request per product, and hands the result to \Drupal\commerce_unleashed\UnleashedManager::syncProductVariation. This is expensive — a catalog of 9,000 products costs 9,000 requests per run — and it does NOT return the attribute set, which the single-product endpoint omits. With "Read attribute sets" on, the list read already carries the complete record, so this is only for something that endpoint returns and the list does not.'),
       '#default_value' => $config->get('products.full') ?? FALSE,
       '#required' => FALSE,
     ];

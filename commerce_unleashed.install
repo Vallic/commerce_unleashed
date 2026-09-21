@@ -5,6 +5,8 @@
  * The install file.
  */
 
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+
 /**
  * Implements hook_schema().
  */
@@ -63,4 +65,24 @@ function commerce_unleashed_schema(): array {
     ],
   ];
   return $schema;
+}
+
+/**
+ * Read attribute sets on product sync, and record the obsolete choice.
+ */
+function commerce_unleashed_update_10001(): string {
+  $config = \Drupal::configFactory()->getEditable('commerce_unleashed.settings');
+
+  // Written explicitly rather than left to the code default, so the setting
+  // says what the site does and an admin can see it on the settings form.
+  $config
+    ->set('products.include_attributes', TRUE)
+    ->set('products.include_obsolete', FALSE)
+    ->save();
+
+  if ($config->get('products.full')) {
+    return (string) new TranslatableMarkup('Product reads now ask for attribute sets. "Fetch each product individually" is still on: it costs one API request per product and does not return the attribute set, so check whether it is still needed.');
+  }
+
+  return (string) new TranslatableMarkup('Product reads now ask for attribute sets, so a product record arrives complete instead of the seven brief fields. Obsolete products stay excluded; turn them on under Unleashed settings if the back catalog matters.');
 }

@@ -4,6 +4,8 @@ api_key: ''
 products:
   sync: false
   full: 0
+  include_attributes: true
+  include_obsolete: false
   cron: 0
   type: default
   store: '1'

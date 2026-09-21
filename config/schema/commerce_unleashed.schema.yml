@@ -23,6 +23,12 @@ commerce_unleashed.settings:
         full:
           type: boolean
           label: 'Full sync'
+        include_attributes:
+          type: boolean
+          label: 'Include attribute sets in product reads'
+        include_obsolete:
+          type: boolean
+          label: 'Include obsolete products'
         type:
           type: string
           label: 'Default variation type'

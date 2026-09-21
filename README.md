@@ -48,9 +48,13 @@ Configure api key and id.
 
 **Product settings**
 * Enable sync.
-* Full sync - by default we are running brief=true for faster sync.
-  With full sync on, each product is fetched individually so that the complete
-  record is available, which costs one extra API request per product.
+* Read attribute sets - on by default, and the reason a product read is not
+  `brief=true`. See "What a product read returns" below.
+* Include obsolete products - Unleashed leaves obsolete products out of a
+  product read unless asked. Off by default.
+* Fetch each product individually - the old "full sync". Fetches every product
+  again, one request per product. It does **not** return the attribute set, so
+  with attribute reads on there is usually no reason to turn this on.
 * Select default variation type, product type, store and currency.
   The product type is the type new **products** are created as, and is separate
   from the variation type. Left empty it falls back to the variation type, which
@@ -124,6 +128,35 @@ $client = new \Drupal\commerce_unleashed\UnleashedClient('api_id', 'api_key');
 $client->getProduct('xxxx-xxxx-xxxx-xxxx');
 ```
 
+## What a product read returns
+
+Unleashed has two shapes of product record, and they are mutually exclusive:
+
+| | `brief=true` | `includeAttributes=true` |
+| --- | --- | --- |
+| Fields | 7 | the complete record |
+| Attribute set | no | yes |
+| Product group, supplier, obsolete flag | no | yes |
+
+The seven brief fields are `Guid`, `ProductCode`, `ProductDescription`,
+`DefaultPurchasePrice`, `DefaultSellPrice`, `SellPriceTier1` and
+`DefaultSupplierId`.
+
+**`brief=true` suppresses `includeAttributes`.** Sending both returns no
+attributes, silently - so the module sends one or the other, never both.
+
+Attribute sets are how Unleashed models per-product flags, and a sync that
+cannot see them cannot act on them. That is why attribute reads are the
+default even though a complete record is a larger response than a brief one:
+it is still **one request per page**, whereas fetching each product
+individually is one request per product and returns no attribute set at all,
+because the single-product endpoint omits it.
+
+Obsolete products are a separate axis. A storefront listing only current lines
+wants them left out; anything reconciling against a back catalog needs them,
+since an obsolete product is still one the store may hold stock of and have
+sold. Expect a substantially larger catalog with them on.
+
 API USAGE
 ---------
 
@@ -154,5 +187,7 @@ Worth knowing when estimating a budget:
 * Cron syncs stock on hand at most every ten minutes. On a catalog of ~9,000
   products that is roughly 18 requests a run at the default page size, so about
   78,000 a month - worth turning off if you are not consuming the stock table.
-* Full product sync costs one **additional** request per product, on top of the
-  list pages.
+* Fetching each product individually costs one **additional** request per
+  product, on top of the list pages - a 9,000-product catalog is ~9,000 extra
+  requests per run, for a record the list read already returns in full when
+  attribute reads are on.

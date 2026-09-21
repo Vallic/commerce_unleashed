@@ -17,13 +17,24 @@ function commerce_unleashed_cron(): void {
 
   if ($settings->get('products.cron')) {
     $last_product_sync = Drupal::keyValue('commerce_unleashed')->get('products') ?? 0;
-    $query = 'brief=true';
-    if ($last_product_sync > 0) {
-      $last_modified_date = date('Y-m-d', $last_product_sync);
-      $query .= '&modifiedSince=' . $last_modified_date;
+
+    // Cron reads a DELTA and never the whole catalog.
+    //
+    // A first run with no marker would otherwise walk every page of the
+    // catalog inside a cron request - a hundred-odd API requests and tens of
+    // thousands of products in one process, on a schedule, with no progress
+    // kept if it is killed part way. That belongs in a batch a human starts:
+    // commerce_unleashed:sync:products:full, which sets the marker below when
+    // it completes, after which cron has a delta to read and takes over.
+    if ($last_product_sync <= 0) {
+      Drupal::logger('commerce_unleashed')->warning('Product sync on cron is on, but the catalog has never been read in full, so there is nothing to take a delta from. Run `drush commerce_unleashed:sync:products:full` once; cron will follow it from then on.');
     }
-    Drupal::service('commerce_unleashed.manager')->syncProducts($query);
-    Drupal::keyValue('commerce_unleashed')->set('products', time());
+    else {
+      $query = Drupal::service('commerce_unleashed.manager')->getProductsBaseQuery()
+        . '&modifiedSince=' . date('Y-m-d', $last_product_sync);
+      Drupal::service('commerce_unleashed.manager')->syncProducts($query);
+      Drupal::keyValue('commerce_unleashed')->set('products', Drupal::time()->getRequestTime());
+    }
   }
 
   if ($settings->get('stock.sync')) {

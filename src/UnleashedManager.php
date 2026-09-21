@@ -71,25 +71,37 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function syncProducts(string $query = '', ?int $page_number = NULL): void {
+    $page = $page_number ?? 1;
+
+    do {
+      $result = $this->syncProductPage($query, $page);
+      $page++;
+    } while ($result['items'] > 0 && $page <= $result['pages']);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function syncProductPage(string $query = '', int $page_number = 1): array {
     $query = $this->withPageSize($query, $this->getProductsPageSize($query));
     $products = $this->unleashedClient->getProducts($query, $page_number);
-    $pages = $products['Pagination']['NumberOfPages'];
-    $page_number = $products['Pagination']['PageNumber'];
-    if (!empty($products['Items'])) {
-      foreach ($products['Items'] as $product) {
 
-        $unleashed_sync_event = new UnleashedSyncEvent($product);
-        $this->eventDispatcher->dispatch($unleashed_sync_event, UnleashedEvents::UNLEASHED_SYNC_EVENT);
-        if ($unleashed_sync_event->skipSync()) {
-          continue;
-        }
-        $this->queueSyncJob($product);
+    $items = $products['Items'] ?? [];
+    foreach ($items as $product) {
+      $unleashed_sync_event = new UnleashedSyncEvent($product);
+      $this->eventDispatcher->dispatch($unleashed_sync_event, UnleashedEvents::UNLEASHED_SYNC_EVENT);
+      if ($unleashed_sync_event->skipSync()) {
+        continue;
       }
-
-      if ($pages > 1 && $page_number < $pages) {
-        $this->syncProducts($query, $page_number + 1);
-      }
+      $this->queueSyncJob($product);
     }
+
+    return [
+      'pages' => (int) ($products['Pagination']['NumberOfPages'] ?? 1),
+      'page' => (int) ($products['Pagination']['PageNumber'] ?? $page_number),
+      'items' => count($items),
+      'total' => (int) ($products['Pagination']['NumberOfItems'] ?? 0),
+    ];
   }
 
   /**
@@ -522,6 +534,64 @@ class UnleashedManager implements UnleashedManagerInterface {
    */
   public function getVariationType(): string {
     return $this->unleashedSettings()->get('products.type');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getProductsBaseQuery(): string {
+    $parts = [];
+
+    // Attributes are the reason this is not `brief=true`.
+    //
+    // `brief=true` returns seven fields - Guid, ProductCode,
+    // ProductDescription, DefaultPurchasePrice, DefaultSellPrice,
+    // SellPriceTier1, DefaultSupplierId - and nothing else: no ProductGroup,
+    // no Supplier, no Obsolete, and no AttributeSet. It also SUPPRESSES
+    // `includeAttributes`, so the two cannot be combined to get the best of
+    // both; asking for attributes while brief is on returns none.
+    //
+    // Attribute sets are how Unleashed models the per-product flags an
+    // integration actually keys on, so a sync that cannot see them cannot make
+    // most of the decisions it exists to make. A full list read costs more per
+    // page than a brief one, but it is still one request per page rather than
+    // the one request PER PRODUCT that ::syncFullProduct() costs - and unlike
+    // that, it does return the attribute set.
+    if ($this->includeAttributes()) {
+      $parts[] = 'includeAttributes=true';
+    }
+    else {
+      $parts[] = 'brief=true';
+    }
+
+    // Obsolete products are excluded by the API unless asked for. Whether they
+    // matter is a site decision: a storefront that only sells current lines
+    // wants them gone, while anything reconciling against a back catalog needs
+    // them, because an obsolete product in Unleashed is still a product the
+    // store may hold stock of and have sold.
+    if ($this->includeObsolete()) {
+      $parts[] = 'includeObsolete=true';
+    }
+
+    return implode('&', $parts);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function includeAttributes(): bool {
+    // Defaults to TRUE. The alternative is a sync that silently cannot see
+    // attribute sets, which is the more surprising of the two behaviors.
+    $value = $this->unleashedSettings()->get('products.include_attributes');
+
+    return $value === NULL ? TRUE : (bool) $value;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function includeObsolete(): bool {
+    return (bool) $this->unleashedSettings()->get('products.include_obsolete');
   }
 
   /**
