@@ -24,7 +24,12 @@ include:
 ################
 variables:
   _CSPELL_WORDS: 'Unleashed,advancedqueue,vallic'
-  OPT_IN_TEST_PREVIOUS_MAJOR: 1
+  # Jobs default to $CORE_PHP_MIN, which is 8.3 for Drupal 11. This module
+  # requires 8.4, so composer refuses to resolve on the default image.
+  _TARGET_PHP: '8.4'
+  # Not opted in: this module supports Drupal 11 only, so a previous-major
+  # job would install Drupal 10 and fail on core_version_requirement.
+  OPT_IN_TEST_PREVIOUS_MAJOR: 0
 #   SKIP_ESLINT: '1'
 #   OPT_IN_TEST_NEXT_MAJOR: '1'
 #   _CURL_TEMPLATES_REF: 'main'

@@ -58,7 +58,7 @@ class SettingsForm extends ConfigFormBase {
     $form['help'] = [
       '#type' => 'markup',
       '#markup' => '<div class="messages messages--info">' .
-      $this->t('To obtain your API credentials, please visit the <a href="@url" target="_blank">Unleashed API Integration page</a> and follow the instructions to generate your API ID and API Key.', [
+      $this->t('To obtain your API credentials, visit the <a href="@url" target="_blank">Unleashed API Integration page</a> and follow the instructions to generate your API ID and API Key.', [
         '@url' => 'https://au.unleashedsoftware.com/v2/Integration/Api',
       ]) . '</div>',
       '#weight' => -10,
