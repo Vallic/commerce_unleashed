@@ -1,0 +1,7 @@
+commerce_unleashed_invoice.settings:
+  path: '/admin/commerce/config/unleashed/invoices'
+  defaults:
+    _form: '\Drupal\commerce_unleashed_invoice\Form\SettingsForm'
+    _title: 'Unleashed invoices'
+  requirements:
+    _permission: 'administer commerce_invoice'

@@ -1,0 +1,16 @@
+commerce_unleashed_invoice.settings:
+  type: config_object
+  label: 'Commerce Unleashed Invoice settings'
+  mapping:
+    sync:
+      type: boolean
+      label: 'Mirror invoices from Unleashed'
+    order_states:
+      type: sequence
+      label: 'Order states that trigger an invoice read'
+      sequence:
+        type: string
+        label: 'Order state'
+    queue_on_transition:
+      type: boolean
+      label: 'Queue the read rather than making it during the request'

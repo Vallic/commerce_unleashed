@@ -132,6 +132,27 @@ class UnleashedClient {
   }
 
   /**
+   * Returns sales invoices, paginated.
+   *
+   * Read-only: Unleashed exposes no write operation on invoices, which is why
+   * the integration built on this mirrors rather than pushes.
+   *
+   * @see https://apidocs.unleashedsoftware.com/Invoices
+   */
+  public function getInvoices(string $query = '', ?int $page_number = NULL): array {
+    return $this->request('GET', $page_number ? 'Invoices/' . $page_number : 'Invoices', [], $query);
+  }
+
+  /**
+   * Returns a single sales invoice.
+   *
+   * @see https://apidocs.unleashedsoftware.com/Invoices
+   */
+  public function getInvoice($guid): array {
+    return $this->request('GET', 'Invoices/' . $guid);
+  }
+
+  /**
    * Returns purchase orders, paginated.
    *
    * @see https://apidocs.unleashedsoftware.com/Purchases

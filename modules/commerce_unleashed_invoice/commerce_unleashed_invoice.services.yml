@@ -1,0 +1,27 @@
+services:
+  logger.channel.commerce_unleashed_invoice:
+    parent: logger.channel_base
+    arguments: ['commerce_unleashed_invoice']
+
+  # Mirrors one order's Unleashed invoice. Read-only by design: the Unleashed
+  # Invoices endpoint has no write operation.
+  commerce_unleashed_invoice.sync:
+    class: Drupal\commerce_unleashed_invoice\InvoiceSync
+    arguments:
+      - '@commerce_unleashed.manager'
+      - '@entity_type.manager'
+      - '@config.factory'
+      - '@logger.channel.commerce_unleashed_invoice'
+
+  # Aliased by class name so Drush's AutowireTrait can resolve it by type.
+  Drupal\commerce_unleashed_invoice\InvoiceSync: '@commerce_unleashed_invoice.sync'
+
+  # Hook implementations, declared so their dependencies are injected rather
+  # than fetched from the container inside a hook body.
+  Drupal\commerce_unleashed_invoice\Hook\OrderHooks:
+    class: Drupal\commerce_unleashed_invoice\Hook\OrderHooks
+    arguments:
+      - '@commerce_unleashed_invoice.sync'
+      - '@entity_type.manager'
+    tags:
+      - { name: hooks }

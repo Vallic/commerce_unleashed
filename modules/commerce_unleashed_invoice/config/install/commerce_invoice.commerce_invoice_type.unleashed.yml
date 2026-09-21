@@ -1,0 +1,19 @@
+langcode: en
+status: true
+dependencies:
+  enforced:
+    module:
+      - commerce_unleashed_invoice
+label: 'Unleashed invoice'
+id: unleashed
+# Empty on purpose. The invoice number is Unleashed's InvoiceNumber, and
+# commerce_invoice only generates one when the field is empty - so leaving this
+# unset removes any chance of a local number being invented for a record that
+# already has one.
+numberPattern: ''
+footerText: ''
+paymentTerms: ''
+workflow: invoice_unleashed
+sendConfirmation: false
+confirmationBcc: ''
+traits: {  }

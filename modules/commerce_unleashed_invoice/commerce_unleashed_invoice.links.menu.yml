@@ -1,0 +1,5 @@
+commerce_unleashed_invoice.settings:
+  title: 'Unleashed invoices'
+  description: 'Mirror sales invoices from Unleashed.'
+  route_name: commerce_unleashed_invoice.settings
+  parent: commerce.configuration

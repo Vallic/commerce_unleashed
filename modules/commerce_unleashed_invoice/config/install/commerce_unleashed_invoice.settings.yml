@@ -1,0 +1,4 @@
+sync: false
+order_states:
+  completed: completed
+queue_on_transition: true

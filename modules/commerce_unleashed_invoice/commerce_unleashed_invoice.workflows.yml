@@ -1,0 +1,41 @@
+# The states Unleashed actually puts an invoice in.
+#
+# Deliberately NOT commerce_invoice's default vocabulary. Unleashed owns the
+# invoice - the API is read-only, there is nothing to push back - so a state
+# this site can reach but Unleashed cannot express would be a state the mirror
+# could never restore after the next read. Every state here is one the API
+# reports, and every transition is driven by a read rather than by a person.
+#
+# `draft` is avoided on purpose: commerce_invoice hides draft invoices from
+# customers and skips invoice number generation for them, neither of which
+# suits a record that arrives complete, already numbered, from elsewhere.
+invoice_unleashed:
+  id: invoice_unleashed
+  group: commerce_invoice
+  label: 'Unleashed'
+  states:
+    parked:
+      label: Parked
+    completed:
+      label: Completed
+    paid:
+      label: Paid
+    deleted:
+      label: Deleted
+  transitions:
+    complete:
+      label: 'Complete'
+      from: [parked]
+      to: completed
+    pay:
+      label: 'Mark as paid'
+      from: [parked, completed]
+      to: paid
+    delete:
+      label: 'Delete'
+      from: [parked, completed, paid]
+      to: deleted
+    reinstate:
+      label: 'Reinstate'
+      from: [deleted]
+      to: completed
