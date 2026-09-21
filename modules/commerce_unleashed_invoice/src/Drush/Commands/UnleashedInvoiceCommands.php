@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\commerce_unleashed_invoice\Drush\Commands;
 
 use Drupal\commerce_order\Entity\OrderInterface;
+use Drupal\commerce_unleashed_invoice\CreditNoteSync;
 use Drupal\commerce_unleashed_invoice\InvoiceSync;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drush\Attributes as CLI;
@@ -20,6 +21,7 @@ final class UnleashedInvoiceCommands extends DrushCommands {
 
   public function __construct(
     private readonly InvoiceSync $invoiceSync,
+    private readonly CreditNoteSync $creditNoteSync,
     private readonly EntityTypeManagerInterface $entityTypeManager,
   ) {
     parent::__construct();
@@ -108,6 +110,48 @@ final class UnleashedInvoiceCommands extends DrushCommands {
     ));
 
     return $counts['failed'] > 0 ? self::EXIT_FAILURE : self::EXIT_SUCCESS;
+  }
+
+  /**
+   * Reads credit notes from Unleashed.
+   *
+   * Paged rather than per order: the CreditNotes endpoint accepts an order or
+   * invoice filter and then ignores it, returning the whole set either way.
+   * Credit notes are few enough for that to be affordable, and a repeat run
+   * narrows to what has changed since the last one.
+   */
+  #[CLI\Command(name: 'commerce-unleashed:credit-notes', aliases: ['cu-credits'])]
+  #[CLI\Option(name: 'full', description: 'Read every credit note rather than only what changed since the last completed run.')]
+  #[CLI\Option(name: 'since', description: 'Read everything modified on or after this date (YYYY-MM-DD). Overrides --full.')]
+  #[CLI\Usage(name: 'drush commerce-unleashed:credit-notes', description: 'Read what has changed since the last run.')]
+  #[CLI\Usage(name: 'drush commerce-unleashed:credit-notes --full', description: 'Read every credit note.')]
+  public function creditNotes(array $options = ['full' => FALSE, 'since' => NULL]): int {
+    $since = $options['since'] ? (string) $options['since'] : NULL;
+    if ($since !== NULL && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $since)) {
+      $this->io()->error(sprintf('--since must be YYYY-MM-DD, got %s.', $since));
+
+      return self::EXIT_FAILURE;
+    }
+
+    $result = $this->creditNoteSync->sync((bool) $options['full'], $since);
+
+    if ($result['failed']) {
+      $this->io()->error('Unleashed could not be read in full; the delta marker was not moved.');
+
+      return self::EXIT_FAILURE;
+    }
+
+    $this->io()->writeln(sprintf(
+      '%d credit note(s) read: %d created, %d updated, %d unchanged, %d skipped, in %d request(s).',
+      $result['read'],
+      $result['created'],
+      $result['updated'],
+      $result['unchanged'],
+      $result['skipped'],
+      $result['requests'],
+    ));
+
+    return self::EXIT_SUCCESS;
   }
 
   /**

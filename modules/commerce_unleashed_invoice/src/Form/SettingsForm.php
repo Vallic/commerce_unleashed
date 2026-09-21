@@ -62,6 +62,13 @@ final class SettingsForm extends ConfigFormBase {
       '#default_value' => $config->get('sync'),
     ];
 
+    $form['credit_notes'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Mirror credit notes from Unleashed'),
+      '#description' => $this->t('Credit notes are read in pages rather than per order, because the Unleashed endpoint accepts an order filter and then ignores it. Nothing runs automatically: use <code>drush commerce-unleashed:credit-notes</code>, which reads only what has changed since the last completed run.'),
+      '#default_value' => $config->get('credit_notes'),
+    ];
+
     $form['order_states'] = [
       '#type' => 'checkboxes',
       '#title' => $this->t('Read the invoice when an order reaches'),
@@ -88,6 +95,7 @@ final class SettingsForm extends ConfigFormBase {
       ->set('sync', (bool) $form_state->getValue('sync'))
       ->set('order_states', array_values(array_filter($form_state->getValue('order_states'))))
       ->set('queue_on_transition', (bool) $form_state->getValue('queue_on_transition'))
+      ->set('credit_notes', (bool) $form_state->getValue('credit_notes'))
       ->save();
 
     parent::submitForm($form, $form_state);

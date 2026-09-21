@@ -14,3 +14,6 @@ commerce_unleashed_invoice.settings:
     queue_on_transition:
       type: boolean
       label: 'Queue the read rather than making it during the request'
+    credit_notes:
+      type: boolean
+      label: 'Mirror credit notes from Unleashed'

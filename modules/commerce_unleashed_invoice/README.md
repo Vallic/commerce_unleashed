@@ -1,7 +1,7 @@
 Commerce Unleashed Invoice
 ==========================
 
-Mirrors Unleashed sales invoices onto Commerce invoices.
+Mirrors Unleashed sales invoices and credit notes onto Commerce invoices.
 
 INTRODUCTION
 ------------
@@ -45,7 +45,7 @@ has only just completed.
 CONFIGURATION
 -------------
 
-`Commerce => Configuration => Unleashed invoices`
+`Commerce => Configuration => Unleashed => Invoices`
 
 * **Mirror invoices from Unleashed** - the master switch.
 * **Read the invoice when an order reaches** - which order states trigger a
@@ -54,6 +54,8 @@ CONFIGURATION
 * **Read in the background** - queues the read instead of making it while the
   order is saved. Leave this on: an order should not fail to save, or hang,
   because Unleashed is slow.
+* **Mirror credit notes** - see Credit notes below. Nothing runs
+  automatically; the Drush command is the way in.
 
 BACKFILL
 --------
@@ -69,6 +71,47 @@ drush commerce-unleashed:invoices:backfill --since=2026-01-01 --store=2
 Orders that already carry an invoice are skipped, so the command can be run
 repeatedly to work through a backlog at a pace you are happy to spend.
 
+CREDIT NOTES
+------------
+
+Credit notes are read in **pages, not per order**, and not by preference: the
+CreditNotes endpoint accepts `orderNumber` and `invoiceNumber` and then ignores
+them, returning the whole set either way. There is no way to ask for one
+order's credits, so the only honest approach is to walk the list and match
+locally.
+
+That is affordable because credit notes are rare next to invoices - thousands
+against hundreds of thousands - and a repeat run narrows to what has changed:
+
+```
+drush commerce-unleashed:credit-notes            # since the last completed run
+drush commerce-unleashed:credit-notes --full     # everything
+drush commerce-unleashed:credit-notes --since=2026-01-01
+```
+
+Only a run that finishes moves the delta marker. Recording a partial one would
+mean the pages it never reached are never looked at again, because a delta from
+then on will not mention a credit note that did not change.
+
+Credit notes land in their own `unleashed_credit` invoice type, sharing the
+invoice workflow. Two things are worth knowing:
+
+* **`CreditType: FreeCredit`** has no sales order behind it at all. It is
+  mirrored as a standalone record rather than attached to anything.
+* A credit note whose sales order **is not in this site** is still mirrored,
+  filed against the default store with no customer. Unleashed raises credits
+  against orders this site may never have seen - POS sales, or orders older or
+  newer than whatever was migrated - and dropping them would mean the mirror
+  quietly disagrees with the source. Expect a fair number of these.
+
+The API field names differ from the documentation: the number is
+`CreditNoteNumber` and the status is `Status`, not `CreditNumber` and
+`CreditStatus`.
+
+Unleashed states a credit total as a positive figure and it is mirrored that
+way, unchanged. The invoice type is what says it is a credit; no sign is
+invented here that the source did not state.
+
 THE INVOICE TYPE AND WORKFLOW
 -----------------------------
 
@@ -81,6 +124,10 @@ workflow whose states are the ones Unleashed reports:
 | `Completed` | completed |
 | `PaymentReceived: true` | paid |
 | `Deleted` | deleted |
+
+Credit notes share it. They move through the same statuses, and a second
+vocabulary for the same words would only invite the two to drift apart. A
+credit note carries no payment flag, so `paid` never applies to one.
 
 Payment outranks status; deletion outranks payment. An unrecognized status
 becomes `parked` rather than being guessed at - `parked` claims least, and a
@@ -117,5 +164,6 @@ API USAGE
 ---------
 
 One request per order read, and nothing on cron. A backfill costs exactly one
-request per order it reads. See the API usage notes in Commerce Unleashed's
+request per order it reads. A credit note run costs one request per 200 notes
+in the window, so a delta is usually a single request. See the API usage notes in Commerce Unleashed's
 own README for how that fits a monthly budget.

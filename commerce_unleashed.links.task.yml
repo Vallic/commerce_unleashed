@@ -1,0 +1,6 @@
+# The settings form is the default tab, so submodules can add their own
+# alongside it rather than each claiming a separate menu entry.
+commerce_unleashed.settings:
+  title: 'Settings'
+  route_name: commerce_unleashed.settings
+  base_route: commerce_unleashed.settings

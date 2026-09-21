@@ -153,6 +153,19 @@ class UnleashedClient {
   }
 
   /**
+   * Returns credit notes, paginated.
+   *
+   * Unlike invoices, credit notes cannot be filtered by order or invoice
+   * number - those parameters are accepted and ignored, returning the whole
+   * set - so callers page through and match locally.
+   *
+   * @see https://apidocs.unleashedsoftware.com/CreditNotes
+   */
+  public function getCreditNotes(string $query = '', ?int $page_number = NULL): array {
+    return $this->request('GET', $page_number ? 'CreditNotes/' . $page_number : 'CreditNotes', [], $query);
+  }
+
+  /**
    * Returns purchase orders, paginated.
    *
    * @see https://apidocs.unleashedsoftware.com/Purchases

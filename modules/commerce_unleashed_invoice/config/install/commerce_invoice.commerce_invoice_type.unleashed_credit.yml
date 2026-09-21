@@ -1,0 +1,19 @@
+langcode: en
+status: true
+dependencies:
+  enforced:
+    module:
+      - commerce_unleashed_invoice
+label: 'Unleashed credit note'
+id: unleashed_credit
+# The number is Unleashed's CreditNoteNumber. Empty so nothing local can
+# invent one for a record that already has it.
+numberPattern: ''
+footerText: ''
+paymentTerms: ''
+# The same workflow as invoices: credit notes move through the same Unleashed
+# statuses, and a second vocabulary for the same words would only drift.
+workflow: invoice_unleashed
+sendConfirmation: false
+confirmationBcc: ''
+traits: {  }

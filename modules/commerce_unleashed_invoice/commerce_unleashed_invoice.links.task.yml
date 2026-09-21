@@ -1,0 +1,5 @@
+commerce_unleashed_invoice.settings:
+  title: 'Invoices'
+  route_name: commerce_unleashed_invoice.settings
+  base_route: commerce_unleashed.settings
+  weight: 10

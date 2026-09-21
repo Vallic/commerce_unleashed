@@ -13,8 +13,20 @@ services:
       - '@config.factory'
       - '@logger.channel.commerce_unleashed_invoice'
 
+  # Credit notes are paged rather than fetched per order: the CreditNotes
+  # endpoint accepts an order filter and ignores it.
+  commerce_unleashed_invoice.credit_note_sync:
+    class: Drupal\commerce_unleashed_invoice\CreditNoteSync
+    arguments:
+      - '@commerce_unleashed.manager'
+      - '@entity_type.manager'
+      - '@config.factory'
+      - '@keyvalue'
+      - '@logger.channel.commerce_unleashed_invoice'
+
   # Aliased by class name so Drush's AutowireTrait can resolve it by type.
   Drupal\commerce_unleashed_invoice\InvoiceSync: '@commerce_unleashed_invoice.sync'
+  Drupal\commerce_unleashed_invoice\CreditNoteSync: '@commerce_unleashed_invoice.credit_note_sync'
 
   # Hook implementations, declared so their dependencies are injected rather
   # than fetched from the container inside a hook body.
