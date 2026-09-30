@@ -60,6 +60,14 @@ interface UnleashedManagerInterface {
   public function syncSalesOrder(OrderInterface $order): array;
 
   /**
+   * The Unleashed customer code an order belongs to.
+   *
+   * The order email by default; sites where the customer is not the person
+   * paying subscribe to UNLEASHED_ORDER_CUSTOMER to replace it.
+   */
+  public function getOrderCustomerCode(OrderInterface $order): string;
+
+  /**
    * Resolve the Unleashed customer for a Drupal order.
    *
    * @return array

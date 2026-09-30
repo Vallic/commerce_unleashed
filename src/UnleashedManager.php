@@ -8,6 +8,7 @@ use Drupal\commerce_price\Price;
 use Drupal\commerce_product\Entity\Product;
 use Drupal\commerce_product\Entity\ProductVariationInterface;
 use Drupal\commerce_unleashed\Events\UnleashedEvents;
+use Drupal\commerce_unleashed\Events\UnleashedOrderCustomerEvent;
 use Drupal\commerce_unleashed\Events\UnleashedOrderEvent;
 use Drupal\commerce_unleashed\Events\UnleashedProductEvent;
 use Drupal\commerce_unleashed\Events\UnleashedProductVariationEvent;
@@ -245,7 +246,7 @@ class UnleashedManager implements UnleashedManagerInterface {
       $payload['Supplier']['SupplierCode'] = $this->getSupplierCode();
     }
     else {
-      $payload['Customer']['CustomerCode'] = $order->getEmail();
+      $payload['Customer']['CustomerCode'] = $this->getOrderCustomerCode($order);
       $payload['Warehouse']['WarehouseCode'] = $this->getWarehouseCode();
     }
 
@@ -393,16 +394,39 @@ class UnleashedManager implements UnleashedManagerInterface {
   }
 
   /**
+   * The Unleashed customer code an order belongs to.
+   *
+   * The order email by default, which is right wherever the person paying IS
+   * the customer. Sites where the two differ - a trade representative ordering
+   * for a venue, most obviously - subscribe to UNLEASHED_ORDER_CUSTOMER and
+   * return whatever they key customers on.
+   *
+   * Asked in both places that need it, so one subscriber settles the payload
+   * and the "create the customer if missing" lookup together. They must agree:
+   * resolving them differently raises the order against one customer while
+   * creating another.
+   */
+  public function getOrderCustomerCode(OrderInterface $order): string {
+    $event = new UnleashedOrderCustomerEvent($order, (string) $order->getEmail());
+    $this->eventDispatcher->dispatch($event, UnleashedEvents::UNLEASHED_ORDER_CUSTOMER);
+
+    $code = trim($event->getCustomerCode());
+
+    return $code !== '' ? $code : (string) $order->getEmail();
+  }
+
+  /**
    * Resolve Unleashed customer by Drupal order.
    */
   public function getCustomerFromOrder(OrderInterface $order): array {
-    $customer = $this->getCustomerByMail($order->getEmail());
+    $code = $this->getOrderCustomerCode($order);
+    $customer = $this->getCustomerByMail($code);
 
     if (empty($customer)) {
       $profiles = $order->collectProfiles();
       $payload = [
-        'CustomerCode' => $order->getEmail(),
-        'CustomerName' => $order->getEmail(),
+        'CustomerCode' => $code,
+        'CustomerName' => $code,
         'Email' => $order->getEmail(),
         'Currency' => [
           'CurrencyCode' => $order->getTotalPrice()->getCurrencyCode(),

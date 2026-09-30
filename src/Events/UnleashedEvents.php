@@ -43,4 +43,16 @@ final class UnleashedEvents {
    */
   const UNLEASHED_ORDER = 'commerce_unleashed.event.order';
 
+  /**
+   * Resolves which Unleashed customer an order belongs to.
+   *
+   * Defaults to the order email. Subscribe where the customer is not the
+   * person paying - a trade representative ordering for a venue, say.
+   *
+   * @Event
+   *
+   * @see \Drupal\commerce_unleashed\Events\UnleashedOrderCustomerEvent
+   */
+  const UNLEASHED_ORDER_CUSTOMER = 'commerce_unleashed.event.order_customer';
+
 }

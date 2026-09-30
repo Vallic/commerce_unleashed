@@ -283,8 +283,15 @@ class UnleashedClient {
    *
    * @see https://apidocs.unleashedsoftware.com/Customers
    */
-  public function getCustomers($query = ''): array {
-    return $this->request('GET', 'Customers', [], $query);
+  public function getCustomers(string $query = '', ?int $page_number = NULL): array {
+    // The page number is a PATH segment, the way getProducts() does it and the
+    // way the API documents it. Passing `page=2` in the query string is
+    // accepted and ignored: every request comes back as page 1, with
+    // `PageNumber: 1` in its own pagination block to say so. A caller looping
+    // over pages then reads the first page as many times as there are pages,
+    // which looks like a successful sync of everything and is a sync of the
+    // first @pageSize records.
+    return $this->request('GET', $page_number ? 'Customers/' . $page_number : 'Customers', [], $query);
   }
 
   /**
