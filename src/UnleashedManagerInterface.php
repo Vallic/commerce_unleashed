@@ -3,6 +3,7 @@
 namespace Drupal\commerce_unleashed;
 
 use Drupal\commerce_order\Entity\OrderInterface;
+use Drupal\commerce_shipping\Entity\ShipmentInterface;
 use Drupal\commerce_product\Entity\ProductVariationInterface;
 
 interface UnleashedManagerInterface {
@@ -74,6 +75,24 @@ interface UnleashedManagerInterface {
    *   The Unleashed customer, or an array carrying an 'error' key.
    */
   public function getCustomerFromOrder(OrderInterface $order): array;
+
+  /**
+   * The Unleashed customer with exactly this customer code.
+   *
+   * @return array
+   *   The customer, an empty array when there is none, or an array carrying
+   *   an 'error' key when the lookup failed.
+   */
+  public function getCustomerByCode(string $code): array;
+
+  /**
+   * The Unleashed products with exactly this SKU, read in full.
+   *
+   * @return array[]
+   *   The products, read with the same base query as a list sync. Empty when
+   *   there is none or the read failed; a failure is logged.
+   */
+  public function getProductsBySku(string $sku): array;
 
   /**
    * Sync stock on hand.
@@ -182,6 +201,14 @@ interface UnleashedManagerInterface {
   public function getStockPageSize(): int;
 
   /**
+   * The warehouse codes whose stock counts.
+   *
+   * @return string[]
+   *   Warehouse codes, or an empty array to count every warehouse.
+   */
+  public function getStockWarehouses(): array;
+
+  /**
    * Whether an existing variation's price is updated from Unleashed.
    *
    * Sites whose Drupal price is authoritative — or whose Unleashed price is a
@@ -248,7 +275,7 @@ interface UnleashedManagerInterface {
   /**
    * Get the default shipping SKU.
    */
-  public function getShippingSku(OrderInterface $order): ?string;
+  public function getShippingSku(OrderInterface $order, ?ShipmentInterface $shipment = NULL): ?string;
 
   /**
    * Is the stock sync enabled?

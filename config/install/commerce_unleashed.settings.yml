@@ -20,9 +20,11 @@ sales_orders:
   sync: false
   warehouse_code: 'N/A'
   shipping_sku: 'N/A'
+  order_status: 'Placed'
   types:
     default: 0
 stock:
   sync: false
+  warehouses: []
   availability: false
   local: false

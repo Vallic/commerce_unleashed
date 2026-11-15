@@ -93,12 +93,21 @@ commerce_unleashed.settings:
         complete:
           type: boolean
           label: 'Complete order'
+        order_status:
+          type: string
+          label: 'Status a sales order is created with in Unleashed'
     stock:
       type: mapping
       mapping:
         page_size:
           type: integer
           label: 'Page size for a stock read'
+        warehouses:
+          type: sequence
+          label: 'Warehouses whose stock counts; empty counts every warehouse'
+          sequence:
+            type: string
+            label: 'Warehouse code'
         sync:
           type: boolean
           label: 'Sync stock'

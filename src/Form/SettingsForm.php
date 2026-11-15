@@ -347,6 +347,17 @@ class SettingsForm extends ConfigFormBase {
       ],
     ];
 
+    $form['sales_orders']['order_status'] = [
+      '#type' => 'select',
+      '#title' => $this->t('Order status'),
+      '#description' => $this->t('Status a sales order is created with in Unleashed. Choose Parked when the warehouse works from parked orders and staff complete them once picked.'),
+      '#options' => [
+        'Placed' => $this->t('Placed'),
+        'Parked' => $this->t('Parked'),
+      ],
+      '#default_value' => $config->get('sales_orders.order_status') ?: 'Placed',
+    ];
+
     $form['sales_orders']['complete'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Complete orders from Drupal'),
@@ -379,6 +390,13 @@ class SettingsForm extends ConfigFormBase {
       '#max' => UnleashedManager::MAX_PAGE_SIZE,
     ];
 
+    $form['stock']['warehouses'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Warehouses'),
+      '#description' => $this->t('Comma-separated warehouse codes whose stock counts, for example "WH, MAIN". Each is read separately and the quantities added up; products none of them holds are recorded as out of stock. Leave empty to use the total across every warehouse.'),
+      '#default_value' => implode(', ', (array) ($config->get('stock.warehouses') ?? [])),
+    ];
+
     $form['stock']['availability'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Enforce stock availability'),
@@ -402,6 +420,10 @@ class SettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
+    $stock = $form_state->getValue('stock');
+    $warehouses = array_map('trim', explode(',', (string) ($stock['warehouses'] ?? '')));
+    $stock['warehouses'] = array_values(array_unique(array_filter($warehouses, static fn (string $code): bool => $code !== '')));
+
     $this->config('commerce_unleashed.settings')
       ->set('api_id', $form_state->getValue('api_id'))
       ->set('api_key', $form_state->getValue('api_key'))
@@ -409,7 +431,7 @@ class SettingsForm extends ConfigFormBase {
       ->set('products', $form_state->getValue('products'))
       ->set('purchase_orders', $form_state->getValue('purchase_orders'))
       ->set('sales_orders', $form_state->getValue('sales_orders'))
-      ->set('stock', $form_state->getValue('stock'))
+      ->set('stock', $stock)
       ->save();
     parent::submitForm($form, $form_state);
   }

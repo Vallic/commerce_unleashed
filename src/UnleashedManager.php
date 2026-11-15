@@ -4,6 +4,7 @@ namespace Drupal\commerce_unleashed;
 
 use Drupal\advancedqueue\Job;
 use Drupal\commerce_order\Entity\OrderInterface;
+use Drupal\commerce_shipping\Entity\ShipmentInterface;
 use Drupal\commerce_price\Price;
 use Drupal\commerce_product\Entity\Product;
 use Drupal\commerce_product\Entity\ProductVariationInterface;
@@ -18,12 +19,20 @@ use Drupal\Core\Config\ImmutableConfig;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Datetime\DateFormatterInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Logger\LoggerChannelTrait;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Commerce Core payloads and methods for interaction with Unleashed.
  */
 class UnleashedManager implements UnleashedManagerInterface {
+
+  use LoggerChannelTrait;
+
+  /**
+   * The shipping method field holding that method's Unleashed carriage code.
+   */
+  public const string CARRIAGE_FIELD = 'field_unleashed_carriage_sku';
 
   /**
    * Page size for a delta read.
@@ -109,18 +118,57 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function syncProduct(string $sku): void {
-    $products = $this->unleashedClient->getProductBySku($sku);
-
-    if (!empty($products['Items'])) {
-      foreach ($products['Items'] as $product) {
-        $unleashed_sync_event = new UnleashedSyncEvent($product);
-        $this->eventDispatcher->dispatch($unleashed_sync_event, UnleashedEvents::UNLEASHED_SYNC_EVENT);
-        if ($unleashed_sync_event->skipSync()) {
-          continue;
-        }
-        $this->queueSyncJob($product);
+    foreach ($this->getProductsBySku($sku) as $product) {
+      $unleashed_sync_event = new UnleashedSyncEvent($product);
+      $this->eventDispatcher->dispatch($unleashed_sync_event, UnleashedEvents::UNLEASHED_SYNC_EVENT);
+      if ($unleashed_sync_event->skipSync()) {
+        continue;
       }
+      $this->queueSyncJob($product);
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getProductsBySku(string $sku): array {
+    $sku = trim($sku);
+    if ($sku === '') {
+      return [];
+    }
+
+    // The same base query as a list sync, so a product synced on its own
+    // arrives as complete as one synced in a batch: without it there is no
+    // attribute set, and a subscriber keying on one reads the product as not
+    // having it. The productCode filter matches on the start of the code, so
+    // "ABC1" also returns "ABC10" and "ABC100", across pages.
+    $query = $this->getProductsBaseQuery();
+    $query = ($query === '' ? '' : $query . '&') . 'productCode=' . $sku;
+    $query = $this->withPageSize($query, $this->getProductsPageSize($query));
+
+    $matches = [];
+    $page = 1;
+    do {
+      $data = $this->unleashedClient->getProducts($query, $page);
+      if (!isset($data['Items']) || !is_array($data['Items'])) {
+        $this->getLogger('commerce_unleashed')->error('Product @sku could not be read from Unleashed: @error', [
+          '@sku' => $sku,
+          '@error' => $data['error'] ?? 'no items in the response',
+        ]);
+        return [];
+      }
+
+      foreach ($data['Items'] as $product) {
+        if (strcasecmp(trim((string) ($product['ProductCode'] ?? '')), $sku) === 0) {
+          $matches[] = $product;
+        }
+      }
+
+      $pages = (int) ($data['Pagination']['NumberOfPages'] ?? 1);
+      $page++;
+    } while ($page <= $pages);
+
+    return $matches;
   }
 
   /**
@@ -235,12 +283,21 @@ class UnleashedManager implements UnleashedManagerInterface {
     $payload = [
       'Guid' => $order->uuid(),
       'OrderNumber' => $order->getOrderNumber() ?? $order->id(),
-      'OrderStatus' => 'Placed',
+      // Configurable: a warehouse that picks from parked orders needs
+      // 'Parked', or the order skips the step it works from.
+      'OrderStatus' => $this->getOrderStatus($type),
       'Total' => $order->getTotalPrice()->getNumber(),
       'OrderDate' => $this->dateFormatter->format($order->getCreatedTime(), 'custom', 'Y-m-d\\TH:i:s', 'UTC'),
       // TBD: Add commerce_exchanger rate support.
       'ExchangeRate' => 1,
     ];
+
+    if ($type === self::UNLEASHED_SALES_ORDERS) {
+      // Sent explicitly rather than left to Unleashed's default: relying on
+      // an unstated default is how an order reaches the warehouse with
+      // nothing reserved against it.
+      $payload['AllocateProduct'] = TRUE;
+    }
 
     if ($type === self::UNLEASHED_PURCHASE_ORDERS) {
       $payload['Supplier']['SupplierCode'] = $this->getSupplierCode();
@@ -279,8 +336,21 @@ class UnleashedManager implements UnleashedManagerInterface {
         'ReceiptQuantity' => $item->getQuantity(),
       ];
 
+      // Both are nullable, and a line with no resolved price took the whole
+      // push down with "Call to a member function add() on null" a few lines
+      // below. Skipped and logged instead: one unpriced line should not stop
+      // the rest of the order reaching Unleashed, and a line Unleashed cannot
+      // price is one somebody has to look at anyway.
       $unit_price = $item->getUnitPrice();
       $line_total = $item->getTotalPrice();
+      if ($unit_price === NULL || $line_total === NULL) {
+        $this->getLogger('commerce_unleashed')->warning('Order @order line @line (@sku) has no price, so it was left out of the Unleashed payload.', [
+          '@order' => $order->id(),
+          '@line' => $item->id(),
+          '@sku' => $purchased_entity instanceof ProductVariationInterface ? $purchased_entity->getSku() : '(no variation)',
+        ]);
+        continue;
+      }
 
       $tax_item_total = new Price('0', $currency);
       $promotion_item_total = new Price('0', $currency);
@@ -298,10 +368,16 @@ class UnleashedManager implements UnleashedManagerInterface {
         else {
           $promotion_item_total = $promotion_item_total->add($adjustment->getAmount());
           $promotion_total = $promotion_total->add($adjustment->getAmount());
+          // An INCLUDED promotion is already inside the unit price, so the
+          // undiscounted price is the unit price LESS the (negative) amount —
+          // the same direction as an included tax above. Adding it took the
+          // discount off a second time below, where the line and the subtotal
+          // apply the promotion, and Unleashed refused the order because its
+          // subtotal and tax no longer reached the total.
           if ($adjustment->isIncluded()) {
-            $unit_price = $unit_price->add($adjustment->getAmount()->divide($item->getQuantity()));
-            $line_total = $line_total->add($adjustment->getAmount());
-            $subtotal = $subtotal->add($adjustment->getAmount());
+            $unit_price = $unit_price->subtract($adjustment->getAmount()->divide($item->getQuantity()));
+            $line_total = $line_total->subtract($adjustment->getAmount());
+            $subtotal = $subtotal->subtract($adjustment->getAmount());
           }
         }
       }
@@ -310,6 +386,10 @@ class UnleashedManager implements UnleashedManagerInterface {
       $item_payload['LineTotal'] = $line_total->add($promotion_item_total)->getNumber();
 
       $item_payload['LineTax'] = $tax_item_total->getNumber();
+      // A line with no tax adjustment is zero-rated (a VAT-exempt product, or
+      // an order outside the VAT area), and says so: left unset, Unleashed
+      // falls back to the order's rate for it.
+      $item_payload['TaxRate'] ??= '0';
       $item_payload['DiscountRate'] = $promotion_item_total->isZero() ? '0.00' : (string) abs((float) $promotion_item_total->divide($line_total->getNumber())->getNumber());
 
       if (!$promotion_item_total->isZero()) {
@@ -327,7 +407,7 @@ class UnleashedManager implements UnleashedManagerInterface {
       $item_payload = [
         'LineNumber' => time(),
         'Product' => [
-          'ProductCode' => $this->getShippingSku($order),
+          'ProductCode' => $this->getShippingSku($order, $shipment),
         ],
         'Currency' => [
           'CurrencyCode' => $currency,
@@ -358,6 +438,9 @@ class UnleashedManager implements UnleashedManagerInterface {
 
       $item_payload['UnitPrice'] = $unit_price->getNumber();
       $item_payload['LineTotal'] = $line_total->getNumber();
+      // Zero-rated unless a tax adjustment said otherwise, as for products.
+      $item_payload['LineTax'] ??= '0';
+      $item_payload['TaxRate'] ??= '0';
       // Unleashed handle shipping as a line item.
       $subtotal = $subtotal->add($unit_price);
 
@@ -365,8 +448,19 @@ class UnleashedManager implements UnleashedManagerInterface {
     }
 
     $payload['TaxTotal'] = $tax_total->getNumber();
-    $tax_rate = abs((float) $tax_total->divide($order->getTotalPrice()->subtract($tax_total)->getNumber())->getNumber());
-    $payload['TaxRate'] = $tax_total->isZero() ? '0.00' : (string) round($tax_rate, 2, PHP_ROUND_HALF_UP);
+    // The order's own rate is the one its taxed lines are charged at, not the
+    // tax as a share of the whole order. Unleashed resolves this rate to one of
+    // its taxes and refuses the order when none matches, and a blended rate
+    // matches nothing as soon as one line is zero-rated: 20% VAT on most of an
+    // order and a VAT-exempt bottle came to 0.18, "The TaxCode '' and TaxRate
+    // of '0.18' does not map to a valid tax". So the order carries the
+    // standard rate, and each line its own.
+    $line_rates = array_map(
+      static fn (array $line): float => (float) $line['TaxRate'],
+      $payload[$line_items_key],
+    );
+    $tax_rate = $line_rates === [] ? 0.0 : max($line_rates);
+    $payload['TaxRate'] = $tax_total->isZero() || $tax_rate <= 0 ? '0.00' : (string) round($tax_rate, 2, PHP_ROUND_HALF_UP);
 
     if ($type === self::UNLEASHED_SALES_ORDERS) {
       $payload['Tax'] = [
@@ -375,6 +469,29 @@ class UnleashedManager implements UnleashedManagerInterface {
     }
 
     $payload['Subtotal'] = $subtotal->add($promotion_total)->getNumber();
+
+    // Unleashed validates Subtotal + TaxTotal == Total and rejects the order
+    // with "invoice sub total ... does not equal invoice total" when they
+    // disagree. They can, because Total comes straight off the order while
+    // these two are built up from adjustments — so anything in the order total
+    // that is not a line or a tax adjustment opens a gap: a shipment whose SKU
+    // Unleashed will not accept, a fee nothing turns into a line, or a migrated
+    // order carrying totals without the adjustments behind them.
+    //
+    // Logged with the actual difference, because Unleashed's own message names
+    // the three numbers but not what is missing from them.
+    if ($type === self::UNLEASHED_SALES_ORDERS) {
+      $stated = new Price((string) $payload['Total'], $currency);
+      $derived = (new Price((string) $payload['Subtotal'], $currency))->add($tax_total);
+      if (!$stated->equals($derived)) {
+        $this->getLogger('commerce_unleashed')->warning('Order @order will be refused by Unleashed: it totals @total but its lines and tax come to @derived, a difference of @gap. Something in the order total is not represented as a line — most often delivery, or a fee.', [
+          '@order' => $order->id(),
+          '@total' => $stated->getNumber(),
+          '@derived' => $derived->getNumber(),
+          '@gap' => $stated->subtract($derived)->getNumber(),
+        ]);
+      }
+    }
     $profiles = $order->collectProfiles();
     if (isset($profiles['shipping'])) {
       $shipping = $profiles['shipping'];
@@ -420,7 +537,13 @@ class UnleashedManager implements UnleashedManagerInterface {
    */
   public function getCustomerFromOrder(OrderInterface $order): array {
     $code = $this->getOrderCustomerCode($order);
-    $customer = $this->getCustomerByMail($code);
+    $customer = $this->getCustomerByCode($code);
+
+    // A failed lookup is not a missing customer. Creating one here would
+    // duplicate an existing customer every time the API had a bad moment.
+    if (isset($customer['error'])) {
+      return $customer;
+    }
 
     if (empty($customer)) {
       $profiles = $order->collectProfiles();
@@ -458,40 +581,223 @@ class UnleashedManager implements UnleashedManagerInterface {
   }
 
   /**
-   * Get customer by mail.
+   * {@inheritdoc}
    */
-  public function getCustomerByMail(string $mail): array {
-    $response = $this->unleashedClient->getCustomers('customerCode=' . $mail);
-
-    if (empty($response['Items'])) {
+  public function getCustomerByCode(string $code): array {
+    $code = trim($code);
+    if ($code === '') {
       return [];
     }
 
-    return $response['Items'][0];
+    // The customerCode filter does not match exactly: "jo@example.com" also
+    // returns "jo@example.com.au". Taking the first item raised orders against
+    // whichever customer the API listed first.
+    $query = 'customerCode=' . $code;
+    $case_match = [];
+    $page = 1;
+    do {
+      $response = $this->unleashedClient->getCustomers($query, $page);
+      if (isset($response['error'])) {
+        return $response;
+      }
+      if (!isset($response['Items']) || !is_array($response['Items'])) {
+        return ['error' => sprintf('Customer %s could not be read from Unleashed.', $code)];
+      }
+
+      foreach ($response['Items'] as $customer) {
+        $candidate = trim((string) ($customer['CustomerCode'] ?? ''));
+        if ($candidate === $code) {
+          return $customer;
+        }
+        // Unleashed treats codes that differ only in case as the same code,
+        // so creating one would be refused. Kept in case no exact match turns
+        // up on a later page.
+        if ($case_match === [] && strcasecmp($candidate, $code) === 0) {
+          $case_match = $customer;
+        }
+      }
+
+      $pages = (int) ($response['Pagination']['NumberOfPages'] ?? 1);
+      $page++;
+    } while ($page <= $pages);
+
+    return $case_match;
+  }
+
+  /**
+   * Get customer by code.
+   *
+   * @deprecated in commerce_unleashed:1.1.0 and is removed from
+   *   commerce_unleashed:2.0.0. Use ::getCustomerByCode() instead, which
+   *   matches the code exactly and reports a failed lookup as an error.
+   * @see https://www.drupal.org/project/commerce_unleashed/issues/3624766
+   */
+  public function getCustomerByMail(string $mail): array {
+    @trigger_error(__METHOD__ . '() is deprecated in commerce_unleashed:1.1.0 and is removed from commerce_unleashed:2.0.0. Use ::getCustomerByCode() instead.', E_USER_DEPRECATED);
+    $customer = $this->getCustomerByCode($mail);
+
+    return isset($customer['error']) ? [] : $customer;
   }
 
   /**
    * {@inheritdoc}
    */
   public function syncStockOnHand($page_number = NULL): void {
-    $data = $this->unleashedClient->getStockOnHand('pageSize=' . $this->getStockPageSize(), $page_number);
-    $pages = $data['Pagination']['NumberOfPages'];
-    $page_number = $data['Pagination']['PageNumber'];
-
-    foreach ($data['Items'] as $item) {
-      $this->connection->merge(self::UNLEASHED_STOCK_TABLE)->fields([
-        'ProductCode' => $item['ProductCode'],
-        'ProductGuid' => $item['ProductGuid'],
-        'AllocatedQty' => $item['AllocatedQty'],
-        'AvailableQty' => $item['AvailableQty'],
-        'QtyOnHand' => $item['QtyOnHand'],
-        'timestamp' => time(),
-      ])->condition('ProductGuid', $item['ProductGuid'])->execute();
+    $warehouses = $this->getStockWarehouses();
+    if ($warehouses === []) {
+      $this->syncAllWarehouseStock($page_number ?? 1);
+      return;
     }
 
-    if ($pages > 1 && $page_number < $pages) {
-      $this->syncStockOnHand($page_number + 1);
+    $this->syncWarehouseStock($warehouses);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getStockWarehouses(): array {
+    $codes = (array) ($this->unleashedSettings()->get('stock.warehouses') ?? []);
+    $codes = array_map(static fn ($code): string => trim((string) $code), $codes);
+
+    return array_values(array_unique(array_filter($codes, static fn (string $code): bool => $code !== '')));
+  }
+
+  /**
+   * Reads stock on hand across every warehouse, as Unleashed totals it.
+   */
+  protected function syncAllWarehouseStock(int $page): void {
+    $query = 'pageSize=' . $this->getStockPageSize();
+
+    do {
+      $data = $this->unleashedClient->getStockOnHand($query, $page);
+      if (!isset($data['Items']) || !is_array($data['Items'])) {
+        $this->getLogger('commerce_unleashed')->error('Stock on hand page @page could not be read: @error', [
+          '@page' => $page,
+          '@error' => $data['error'] ?? 'no items in the response',
+        ]);
+        return;
+      }
+
+      foreach ($data['Items'] as $item) {
+        $this->connection->merge(self::UNLEASHED_STOCK_TABLE)->fields([
+          'ProductCode' => $item['ProductCode'],
+          'ProductGuid' => $item['ProductGuid'],
+          'AllocatedQty' => $item['AllocatedQty'],
+          'AvailableQty' => $item['AvailableQty'],
+          'QtyOnHand' => $item['QtyOnHand'],
+          'timestamp' => time(),
+        ])->condition('ProductGuid', $item['ProductGuid'])->execute();
+      }
+
+      $pages = (int) ($data['Pagination']['NumberOfPages'] ?? 1);
+      $page++;
+    } while ($page <= $pages);
+  }
+
+  /**
+   * Reads stock on hand from the given warehouses only, summed per product.
+   *
+   * Unleashed's own total counts every warehouse, which is wrong wherever one
+   * of them is not stock the store can sell from: a retail shop, a bonded
+   * store, a returns bay. Each warehouse is read on its own and the figures
+   * added up here.
+   *
+   * Nothing is written unless every warehouse was read. A partial read would
+   * understate every product the missing warehouse holds, which looks like
+   * stock disappearing. An empty read is not written either: it is far more
+   * often a mistyped warehouse code than a store with nothing in it, and
+   * writing it would zero the whole table.
+   *
+   * @param string[] $warehouses
+   *   The warehouse codes whose stock counts.
+   */
+  protected function syncWarehouseStock(array $warehouses): void {
+    $page_size = $this->getStockPageSize();
+    $totals = [];
+
+    foreach ($warehouses as $warehouse) {
+      // Not URL-encoded: the request is signed over the query as given.
+      $query = 'warehouseCode=' . $warehouse . '&pageSize=' . $page_size;
+      $page = 1;
+
+      do {
+        $data = $this->unleashedClient->getStockOnHand($query, $page);
+        if (!isset($data['Items']) || !is_array($data['Items'])) {
+          $this->getLogger('commerce_unleashed')->error('Stock on hand for warehouse @warehouse could not be read (page @page): @error. Nothing was written.', [
+            '@warehouse' => $warehouse,
+            '@page' => $page,
+            '@error' => $data['error'] ?? 'no items in the response',
+          ]);
+          return;
+        }
+
+        foreach ($data['Items'] as $item) {
+          $code = trim((string) ($item['ProductCode'] ?? ''));
+          if ($code === '') {
+            continue;
+          }
+          // Filtered by the query already; checked again so a row from another
+          // warehouse can never be counted.
+          if (isset($item['WarehouseCode']) && strcasecmp(trim((string) $item['WarehouseCode']), $warehouse) !== 0) {
+            continue;
+          }
+
+          $totals[$code] ??= ['guid' => '', 'available' => 0.0, 'allocated' => 0.0, 'on_hand' => 0.0];
+          $totals[$code]['available'] += (float) ($item['AvailableQty'] ?? 0);
+          $totals[$code]['allocated'] += (float) ($item['AllocatedQty'] ?? 0);
+          $totals[$code]['on_hand'] += (float) ($item['QtyOnHand'] ?? 0);
+          if ($totals[$code]['guid'] === '') {
+            $totals[$code]['guid'] = trim((string) ($item['ProductGuid'] ?? ''));
+          }
+        }
+
+        $pages = (int) ($data['Pagination']['NumberOfPages'] ?? 1);
+        $page++;
+      } while ($page <= $pages);
     }
+
+    if ($totals === []) {
+      $this->getLogger('commerce_unleashed')->warning('Unleashed returned no stock for warehouses @warehouses, so nothing was written. Check the warehouse codes in the Unleashed settings.', [
+        '@warehouses' => implode(', ', $warehouses),
+      ]);
+      return;
+    }
+
+    $now = time();
+    foreach ($totals as $code => $row) {
+      $this->connection->merge(self::UNLEASHED_STOCK_TABLE)
+        ->key('ProductCode', $code)
+        ->fields([
+          'ProductGuid' => $row['guid'],
+          'AvailableQty' => $this->formatQuantity($row['available']),
+          'AllocatedQty' => $this->formatQuantity($row['allocated']),
+          'QtyOnHand' => $this->formatQuantity($row['on_hand']),
+          'timestamp' => $now,
+        ])
+        ->execute();
+    }
+
+    // A product none of these warehouses holds is out of stock here, even if
+    // another warehouse has it. Every product that was read now carries $now,
+    // so anything older was not in the read.
+    $this->connection->update(self::UNLEASHED_STOCK_TABLE)
+      ->fields([
+        'AvailableQty' => '0',
+        'AllocatedQty' => '0',
+        'QtyOnHand' => '0',
+        'timestamp' => $now,
+      ])
+      ->condition('timestamp', $now, '<')
+      ->execute();
+  }
+
+  /**
+   * Formats a summed quantity for the varchar quantity columns.
+   */
+  protected function formatQuantity(float $quantity): string {
+    $formatted = rtrim(rtrim(number_format($quantity, 4, '.', ''), '0'), '.');
+
+    return $formatted === '-0' || $formatted === '' ? '0' : $formatted;
   }
 
   /**
@@ -793,9 +1099,35 @@ class UnleashedManager implements UnleashedManagerInterface {
   }
 
   /**
+   * The status an order is created with in Unleashed.
+   *
+   * Configurable because it is a workflow decision rather than a fact about
+   * the order: a site whose warehouse picks from parked orders wants 'Parked',
+   * and one that treats the push as the final word wants 'Placed'.
+   */
+  public function getOrderStatus(string $type = self::UNLEASHED_SALES_ORDERS): string {
+    $status = trim((string) ($this->unleashedSettings()->get(sprintf('%s_orders.order_status', $type)) ?? ''));
+
+    return $status !== '' ? $status : 'Placed';
+  }
+
+  /**
    * {@inheritdoc}
    */
-  public function getShippingSku(OrderInterface $order): string {
+  public function getShippingSku(OrderInterface $order, ?ShipmentInterface $shipment = NULL): string {
+    // The shipping method's own code first. Delivery is often billed against
+    // different Unleashed carriage products by service and destination, and a
+    // single site-wide code would bill an international parcel as domestic.
+    $method = $shipment?->getShippingMethod();
+    if ($method !== NULL && $method->hasField(self::CARRIAGE_FIELD) && !$method->get(self::CARRIAGE_FIELD)->isEmpty()) {
+      $code = trim((string) $method->get(self::CARRIAGE_FIELD)->value);
+      if ($code !== '') {
+        return $code;
+      }
+    }
+
+    // Otherwise the site-wide default, which is also what an unmapped or newly
+    // created method falls back to.
     $type = $this->isOrderEligible($order);
     return $this->unleashedSettings()->get(sprintf('%s_orders.shipping_sku', $type)) ?? '';
   }

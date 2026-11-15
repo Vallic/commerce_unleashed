@@ -27,7 +27,11 @@ class UnleashedClient {
   protected function request(string $method, string $endpoint, array $payload = [], string $query = ''): array {
     $endpoint_url = sprintf('%s%s', self::UNLEASHED_API, $endpoint);
     if (!empty($query)) {
-      $endpoint_url .= '?' . $query;
+      // The signature is over the query as given, and Unleashed checks it
+      // against the query it DECODES. A literal "+" decodes to a space, so a
+      // search for "jo+shop@example.com" was refused with a 403 and read as
+      // "no such customer". Sent encoded, it decodes back to the "+" signed.
+      $endpoint_url .= '?' . str_replace('+', '%2B', $query);
     }
 
     try {
