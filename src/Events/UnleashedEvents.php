@@ -55,4 +55,13 @@ final class UnleashedEvents {
    */
   const UNLEASHED_ORDER_CUSTOMER = 'commerce_unleashed.event.order_customer';
 
+  /**
+   * Fired once per stock sync that changed any total, after it committed.
+   *
+   * @Event
+   *
+   * @see \Drupal\commerce_unleashed\Events\UnleashedStockChangedEvent
+   */
+  const STOCK_CHANGED = 'commerce_unleashed.event.stock_changed';
+
 }

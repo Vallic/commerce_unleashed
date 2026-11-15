@@ -78,11 +78,41 @@ Configure api key and id.
 
 **Stock settings**
 * Enable sync.
-* Enforce stock availability. Note this counts stock across **every** warehouse.
-  If only some of your warehouses are sellable, enforce availability from your
-  own field instead and leave this off.
+* Warehouses - the warehouse codes whose stock counts. Leave empty to use
+  Unleashed's total across every warehouse. See "Stock per warehouse" below.
+* Delta window and full pull interval - used when warehouses are chosen.
+* Enforce stock availability. It reads the stock table, so it counts whatever
+  the sync wrote there: every warehouse, or only the chosen ones.
 * Update local stock after order placement.
 * Page size - see API usage below.
+
+## Stock per warehouse
+When warehouses are chosen, each one is read on its own and the quantities are
+added up per product. The figures per warehouse are kept as well, in the
+`commerce_unleashed_warehouse_stock` table, because a delta read returns a
+product only from the warehouses where it moved; the others come from there.
+
+* A read that fails for any warehouse writes nothing. So does an empty full
+  read: it is far more often a wrong warehouse code than an empty store.
+* A delta only writes the products it saw. A full read also zeroes products
+  none of the chosen warehouses holds any more.
+* Until a full read has filled the per-warehouse table, every run is a full
+  read.
+* One sync runs at a time; a second is skipped.
+
+Cron reads a delta every run (at most every ten minutes) and a full read at
+the configured interval, daily by default. From drush:
+
+```
+drush commerce_unleashed:sync:stock          # delta
+drush commerce_unleashed:sync:stock --full   # every product
+```
+
+After a run that changed any total, `UnleashedEvents::STOCK_CHANGED` is
+dispatched with the before and after quantity per SKU. Subscribe to it to
+reindex search, invalidate caches or tell customers something is back in stock.
+`shouldNotify()` is FALSE for the first full read, which corrects figures
+rather than reporting deliveries.
 
 ## Stock overview
 Go to `Commerce => Stock on hand`

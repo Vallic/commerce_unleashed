@@ -397,6 +397,32 @@ class SettingsForm extends ConfigFormBase {
       '#default_value' => implode(', ', (array) ($config->get('stock.warehouses') ?? [])),
     ];
 
+    $form['stock']['modified_since_days'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Delta window (days)'),
+      '#description' => $this->t('With warehouses chosen, cron reads only stock that moved in this many days, and a full pull at the interval below.'),
+      '#default_value' => $config->get('stock.modified_since_days') ?: 1,
+      '#min' => 1,
+      '#states' => [
+        'invisible' => [
+          ':input[name="stock[warehouses]"]' => ['value' => ''],
+        ],
+      ],
+    ];
+
+    $form['stock']['full_interval'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Full pull interval (seconds)'),
+      '#description' => $this->t('How often cron reads every SKU in full, which catches anything a delta missed. 86400 is daily.'),
+      '#default_value' => $config->get('stock.full_interval') ?: 86400,
+      '#min' => 3600,
+      '#states' => [
+        'invisible' => [
+          ':input[name="stock[warehouses]"]' => ['value' => ''],
+        ],
+      ],
+    ];
+
     $form['stock']['availability'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Enforce stock availability'),

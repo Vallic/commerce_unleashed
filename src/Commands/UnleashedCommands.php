@@ -3,6 +3,7 @@
 namespace Drupal\commerce_unleashed\Commands;
 
 use Drupal\commerce_unleashed\ProductSyncBatch;
+use Drupal\commerce_unleashed\Stock\StockSync;
 use Drupal\commerce_unleashed\UnleashedManagerInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\KeyValueStore\KeyValueFactory;
@@ -25,7 +26,7 @@ class UnleashedCommands extends DrushCommands {
   /**
    * Constructs a new UnleashedCommands object.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, UnleashedManagerInterface $unleashed_manager, KeyValueFactory $keyValueFactory) {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, UnleashedManagerInterface $unleashed_manager, KeyValueFactory $keyValueFactory, protected StockSync $stockSync) {
     parent::__construct();
 
     $this->entityTypeManager = $entity_type_manager;
@@ -150,10 +151,43 @@ class UnleashedCommands extends DrushCommands {
   /**
    * Sync stock.
    *
+   * With warehouses chosen in the settings, reads a delta unless --full is
+   * given; otherwise reads Unleashed's total across every warehouse.
+   *
+   * @param array $options
+   *   The options passed to this drush function.
+   *
    * @command commerce_unleashed:sync:stock
+   * @option full Read every SKU rather than the recent movements.
+   * @option quiet-changes Mark the changes as not news, so listeners do not tell customers about them.
    */
-  public function syncStock(): void {
-    $this->unleashedManager->syncStockOnHand();
+  public function syncStock(array $options = ['full' => FALSE, 'quiet-changes' => FALSE]): int {
+    if ($this->unleashedManager->getStockWarehouses() === []) {
+      $this->unleashedManager->syncStockOnHand();
+      return self::EXIT_SUCCESS;
+    }
+
+    $result = $this->stockSync->sync((bool) $options['full'], !$options['quiet-changes']);
+
+    if ($result['skipped']) {
+      $this->logger()->warning('Skipped: another stock sync is running, or no warehouses are configured.');
+      return self::EXIT_FAILURE;
+    }
+    if ($result['failed']) {
+      $this->logger()->error('No stock was written. See the commerce_unleashed log for why.');
+      return self::EXIT_FAILURE;
+    }
+
+    $this->logger()->success(sprintf(
+      'Stock sync (%s): %d SKUs seen, %d updated, %d zeroed, in %d API request(s).',
+      $result['full'] ? 'full' : 'delta',
+      $result['skus'],
+      $result['updated'],
+      $result['zeroed'],
+      $this->stockSync->requestCount(),
+    ));
+
+    return self::EXIT_SUCCESS;
   }
 
 }

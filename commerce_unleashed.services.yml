@@ -1,7 +1,7 @@
 services:
   commerce_unleashed.manager:
     class: Drupal\commerce_unleashed\UnleashedManager
-    arguments: [ '@entity_type.manager', '@config.factory', '@event_dispatcher', '@date.formatter', '@database' ]
+    arguments: [ '@entity_type.manager', '@config.factory', '@event_dispatcher', '@date.formatter', '@database', !service_closure '@commerce_unleashed.stock_sync' ]
   commerce_unleashed.availability_checker:
     class: Drupal\commerce_unleashed\UnleashedAvailabilityChecker
     arguments:
@@ -13,3 +13,22 @@ services:
     arguments: [ '@entity_type.manager', '@commerce_unleashed.manager' ]
     tags:
       - { name: event_subscriber }
+  logger.channel.commerce_unleashed:
+    parent: logger.channel_base
+    arguments: [ 'commerce_unleashed' ]
+  commerce_unleashed.warehouse_stock_ledger:
+    class: Drupal\commerce_unleashed\Stock\WarehouseStockLedger
+    arguments: [ '@database', '@state', '@datetime.time' ]
+  Drupal\commerce_unleashed\Stock\WarehouseStockLedger: '@commerce_unleashed.warehouse_stock_ledger'
+  commerce_unleashed.stock_sync:
+    class: Drupal\commerce_unleashed\Stock\StockSync
+    arguments:
+      - '@commerce_unleashed.manager'
+      - '@commerce_unleashed.warehouse_stock_ledger'
+      - '@database'
+      - '@config.factory'
+      - '@event_dispatcher'
+      - '@lock'
+      - '@datetime.time'
+      - '@logger.channel.commerce_unleashed'
+  Drupal\commerce_unleashed\Stock\StockSync: '@commerce_unleashed.stock_sync'

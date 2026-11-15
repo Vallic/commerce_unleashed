@@ -5,6 +5,7 @@
  * The install file.
  */
 
+use Drupal\commerce_unleashed\Stock\WarehouseStockLedger;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
 /**
@@ -64,7 +65,73 @@ function commerce_unleashed_schema(): array {
       'product_guid' => ['ProductGuid'],
     ],
   ];
+  $schema[WarehouseStockLedger::TABLE] = _commerce_unleashed_warehouse_stock_schema();
+
   return $schema;
+}
+
+/**
+ * The table holding the last Unleashed figures per SKU per counted warehouse.
+ *
+ * A delta stock pull returns a SKU only from the warehouses where it moved;
+ * the last figures for the others come from here.
+ *
+ * @return array<string, mixed>
+ *   The table definition.
+ */
+function _commerce_unleashed_warehouse_stock_schema(): array {
+  $quantity = static fn (string $description): array => [
+    'type' => 'float',
+    'size' => 'big',
+    'not null' => TRUE,
+    'default' => 0,
+    'description' => $description,
+  ];
+
+  return [
+    'description' => 'The last Unleashed stock figures per SKU per counted warehouse, which delta stock pulls total from.',
+    'fields' => [
+      'ProductCode' => [
+        'type' => 'varchar_ascii',
+        'length' => 255,
+        'not null' => TRUE,
+        'description' => 'The Unleashed product code (SKU).',
+      ],
+      'WarehouseCode' => [
+        'type' => 'varchar_ascii',
+        'length' => 64,
+        'not null' => TRUE,
+        'description' => 'The Unleashed warehouse code.',
+      ],
+      'AvailableQty' => $quantity('Available quantity at the warehouse.'),
+      'AllocatedQty' => $quantity('Allocated quantity at the warehouse.'),
+      'QtyOnHand' => $quantity('Quantity on hand at the warehouse.'),
+      'ProductGuid' => [
+        'type' => 'varchar_ascii',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'The Unleashed product guid.',
+      ],
+      'timestamp' => [
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'When the figures were last written.',
+      ],
+    ],
+    'primary key' => ['ProductCode', 'WarehouseCode'],
+    'indexes' => [
+      'warehouse' => ['WarehouseCode'],
+    ],
+  ];
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function commerce_unleashed_uninstall(): void {
+  \Drupal::state()->delete(WarehouseStockLedger::SEEDED_STATE_KEY);
 }
 
 /**
@@ -103,14 +170,26 @@ function commerce_unleashed_update_10002(): string {
 }
 
 /**
- * Count stock from every warehouse until warehouses are chosen.
+ * Add per-warehouse stock: its table and settings.
  */
 function commerce_unleashed_update_10003(): string {
-  $config = \Drupal::configFactory()->getEditable('commerce_unleashed.settings');
-
-  if ($config->get('stock.warehouses') === NULL) {
-    $config->set('stock.warehouses', [])->save();
+  $schema = \Drupal::database()->schema();
+  if (!$schema->tableExists(WarehouseStockLedger::TABLE)) {
+    $schema->createTable(WarehouseStockLedger::TABLE, _commerce_unleashed_warehouse_stock_schema());
   }
 
-  return (string) new TranslatableMarkup('Stock can now be limited to chosen warehouses under Unleashed settings. Until some are chosen, stock is the total across every warehouse, as before.');
+  $config = \Drupal::configFactory()->getEditable('commerce_unleashed.settings');
+  $defaults = [
+    'stock.warehouses' => [],
+    'stock.modified_since_days' => 1,
+    'stock.full_interval' => 86400,
+  ];
+  foreach ($defaults as $key => $value) {
+    if ($config->get($key) === NULL) {
+      $config->set($key, $value);
+    }
+  }
+  $config->save();
+
+  return (string) new TranslatableMarkup('Stock can now be limited to chosen warehouses under Unleashed settings, kept per warehouse and read as deltas with a regular full pull. Until warehouses are chosen, stock is the total across every warehouse, as before.');
 }

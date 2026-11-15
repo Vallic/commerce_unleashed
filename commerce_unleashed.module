@@ -39,10 +39,28 @@ function commerce_unleashed_cron(): void {
   }
 
   if ($settings->get('stock.sync')) {
-    $last_sync = Drupal::keyValue('commerce_unleashed')->get('stock_on_hand_sync') ?? 0;
-    if ($last_sync < time() - 60 * 10) {
-      Drupal::service('commerce_unleashed.manager')->syncStockOnHand();
-      Drupal::keyValue('commerce_unleashed')->set('stock_on_hand_sync', time());
+    $store = Drupal::keyValue('commerce_unleashed');
+    $now = Drupal::time()->getRequestTime();
+    $last_sync = $store->get('stock_on_hand_sync') ?? 0;
+    if ($last_sync < $now - 60 * 10) {
+      /** @var \Drupal\commerce_unleashed\UnleashedManagerInterface $manager */
+      $manager = Drupal::service('commerce_unleashed.manager');
+      if ($manager->getStockWarehouses() === []) {
+        $manager->syncStockOnHand();
+      }
+      else {
+        // A delta every run, and a full pull at the configured interval: a
+        // SKU whose stock has not moved never appears in a delta, so a stale
+        // figure would otherwise hold forever.
+        $interval = (int) ($settings->get('stock.full_interval') ?: 86400);
+        $last_full = $store->get('stock_on_hand_full') ?? 0;
+        $full = $last_full < $now - $interval;
+        $result = Drupal::service('commerce_unleashed.stock_sync')->sync($full);
+        if ($result['full'] && !$result['skipped'] && !$result['failed']) {
+          $store->set('stock_on_hand_full', $now);
+        }
+      }
+      $store->set('stock_on_hand_sync', $now);
     }
   }
 }

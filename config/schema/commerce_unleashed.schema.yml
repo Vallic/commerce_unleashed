@@ -108,6 +108,12 @@ commerce_unleashed.settings:
           sequence:
             type: string
             label: 'Warehouse code'
+        modified_since_days:
+          type: integer
+          label: 'Days of movement a delta stock pull asks for'
+        full_interval:
+          type: integer
+          label: 'Seconds between full stock pulls on cron'
         sync:
           type: boolean
           label: 'Sync stock'

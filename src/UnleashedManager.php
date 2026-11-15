@@ -66,7 +66,24 @@ class UnleashedManager implements UnleashedManagerInterface {
 
   protected ImmutableConfig $unleashedSettings;
 
-  public function __construct(protected EntityTypeManagerInterface $entityTypeManager, protected ConfigFactoryInterface $configFactory, protected EventDispatcherInterface $eventDispatcher, protected DateFormatterInterface $dateFormatter, protected Connection $connection) {
+  /**
+   * Constructs the manager.
+   *
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   *   The entity type manager.
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
+   *   The config factory.
+   * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $eventDispatcher
+   *   The event dispatcher.
+   * @param \Drupal\Core\Datetime\DateFormatterInterface $dateFormatter
+   *   The date formatter.
+   * @param \Drupal\Core\Database\Connection $connection
+   *   The database.
+   * @param (\Closure(): \Drupal\commerce_unleashed\Stock\StockSync)|null $stockSync
+   *   Returns the per-warehouse stock sync. A closure, because the sync
+   *   depends on this manager.
+   */
+  public function __construct(protected EntityTypeManagerInterface $entityTypeManager, protected ConfigFactoryInterface $configFactory, protected EventDispatcherInterface $eventDispatcher, protected DateFormatterInterface $dateFormatter, protected Connection $connection, protected ?\Closure $stockSync = NULL) {
     $this->unleashedClient = $this->getClient();
   }
 
@@ -643,13 +660,19 @@ class UnleashedManager implements UnleashedManagerInterface {
    * {@inheritdoc}
    */
   public function syncStockOnHand($page_number = NULL): void {
-    $warehouses = $this->getStockWarehouses();
-    if ($warehouses === []) {
-      $this->syncAllWarehouseStock($page_number ?? 1);
+    if ($this->getStockWarehouses() !== []) {
+      // Chosen warehouses are read one at a time and kept per warehouse,
+      // which is StockSync's job. A full pull, because a caller of this method
+      // has always had every SKU rewritten.
+      if ($this->stockSync === NULL) {
+        $this->getLogger('commerce_unleashed')->error('Stock warehouses are configured but the stock sync service is not available, so no stock was pulled.');
+        return;
+      }
+      ($this->stockSync)()->sync(TRUE);
       return;
     }
 
-    $this->syncWarehouseStock($warehouses);
+    $this->syncAllWarehouseStock($page_number ?? 1);
   }
 
   /**
@@ -692,112 +715,6 @@ class UnleashedManager implements UnleashedManagerInterface {
       $pages = (int) ($data['Pagination']['NumberOfPages'] ?? 1);
       $page++;
     } while ($page <= $pages);
-  }
-
-  /**
-   * Reads stock on hand from the given warehouses only, summed per product.
-   *
-   * Unleashed's own total counts every warehouse, which is wrong wherever one
-   * of them is not stock the store can sell from: a retail shop, a bonded
-   * store, a returns bay. Each warehouse is read on its own and the figures
-   * added up here.
-   *
-   * Nothing is written unless every warehouse was read. A partial read would
-   * understate every product the missing warehouse holds, which looks like
-   * stock disappearing. An empty read is not written either: it is far more
-   * often a mistyped warehouse code than a store with nothing in it, and
-   * writing it would zero the whole table.
-   *
-   * @param string[] $warehouses
-   *   The warehouse codes whose stock counts.
-   */
-  protected function syncWarehouseStock(array $warehouses): void {
-    $page_size = $this->getStockPageSize();
-    $totals = [];
-
-    foreach ($warehouses as $warehouse) {
-      // Not URL-encoded: the request is signed over the query as given.
-      $query = 'warehouseCode=' . $warehouse . '&pageSize=' . $page_size;
-      $page = 1;
-
-      do {
-        $data = $this->unleashedClient->getStockOnHand($query, $page);
-        if (!isset($data['Items']) || !is_array($data['Items'])) {
-          $this->getLogger('commerce_unleashed')->error('Stock on hand for warehouse @warehouse could not be read (page @page): @error. Nothing was written.', [
-            '@warehouse' => $warehouse,
-            '@page' => $page,
-            '@error' => $data['error'] ?? 'no items in the response',
-          ]);
-          return;
-        }
-
-        foreach ($data['Items'] as $item) {
-          $code = trim((string) ($item['ProductCode'] ?? ''));
-          if ($code === '') {
-            continue;
-          }
-          // Filtered by the query already; checked again so a row from another
-          // warehouse can never be counted.
-          if (isset($item['WarehouseCode']) && strcasecmp(trim((string) $item['WarehouseCode']), $warehouse) !== 0) {
-            continue;
-          }
-
-          $totals[$code] ??= ['guid' => '', 'available' => 0.0, 'allocated' => 0.0, 'on_hand' => 0.0];
-          $totals[$code]['available'] += (float) ($item['AvailableQty'] ?? 0);
-          $totals[$code]['allocated'] += (float) ($item['AllocatedQty'] ?? 0);
-          $totals[$code]['on_hand'] += (float) ($item['QtyOnHand'] ?? 0);
-          if ($totals[$code]['guid'] === '') {
-            $totals[$code]['guid'] = trim((string) ($item['ProductGuid'] ?? ''));
-          }
-        }
-
-        $pages = (int) ($data['Pagination']['NumberOfPages'] ?? 1);
-        $page++;
-      } while ($page <= $pages);
-    }
-
-    if ($totals === []) {
-      $this->getLogger('commerce_unleashed')->warning('Unleashed returned no stock for warehouses @warehouses, so nothing was written. Check the warehouse codes in the Unleashed settings.', [
-        '@warehouses' => implode(', ', $warehouses),
-      ]);
-      return;
-    }
-
-    $now = time();
-    foreach ($totals as $code => $row) {
-      $this->connection->merge(self::UNLEASHED_STOCK_TABLE)
-        ->key('ProductCode', $code)
-        ->fields([
-          'ProductGuid' => $row['guid'],
-          'AvailableQty' => $this->formatQuantity($row['available']),
-          'AllocatedQty' => $this->formatQuantity($row['allocated']),
-          'QtyOnHand' => $this->formatQuantity($row['on_hand']),
-          'timestamp' => $now,
-        ])
-        ->execute();
-    }
-
-    // A product none of these warehouses holds is out of stock here, even if
-    // another warehouse has it. Every product that was read now carries $now,
-    // so anything older was not in the read.
-    $this->connection->update(self::UNLEASHED_STOCK_TABLE)
-      ->fields([
-        'AvailableQty' => '0',
-        'AllocatedQty' => '0',
-        'QtyOnHand' => '0',
-        'timestamp' => $now,
-      ])
-      ->condition('timestamp', $now, '<')
-      ->execute();
-  }
-
-  /**
-   * Formats a summed quantity for the varchar quantity columns.
-   */
-  protected function formatQuantity(float $quantity): string {
-    $formatted = rtrim(rtrim(number_format($quantity, 4, '.', ''), '0'), '.');
-
-    return $formatted === '-0' || $formatted === '' ? '0' : $formatted;
   }
 
   /**

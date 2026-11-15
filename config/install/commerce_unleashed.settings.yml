@@ -26,5 +26,7 @@ sales_orders:
 stock:
   sync: false
   warehouses: []
+  modified_since_days: 1
+  full_interval: 86400
   availability: false
   local: false
